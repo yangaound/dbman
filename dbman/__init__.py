@@ -209,7 +209,8 @@ class DBManipulator(Connector):
         :param with_header: specify True(default) if the argument table with header, otherwise specify False.
         :param slice_size: the table will be slice to many subtable with slice_size, 1 transaction for 1 subtable.
         """
-        self.make_writer(table=table, table_name=table_name, mode=mode, with_header=with_header, slice_size=slice_size, duplicate_key=duplicate_key)
+        self.make_writer(table=table, table_name=table_name, mode=mode, with_header=with_header, slice_size=slice_size,
+                         duplicate_key=duplicate_key)
         return self.writer.write()
 
     def make_writer(self, **kwargs):
