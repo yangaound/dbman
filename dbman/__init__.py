@@ -4,12 +4,13 @@ Created on 2016年12月10日
 
 @author: albin
 """
-import os
+
 import numbers
 import abc
 
 import yaml
 import petl
+
 try:
     import sqlalchemy
 except ImportError:
@@ -26,15 +27,14 @@ class setting:
 def base_setting(ID, file, driver=None, sqlalchemy_uri=None):
     """
     :param ID: a string represents a database schema.
-    :param a yaml filename users configuration.
-    :param driver: package name of underlying database driver. `str`={'pymysql' | 'MySQLdb' | 'pymssql'}
+    :param file: a yaml filename users configuration.
+    :param driver: driver: package name of underlying database driver. `str`={'pymysql' | 'MySQLdb' | 'pymssql'}
     :param sqlalchemy_uri: user for create a sqlalchemy engine
     """
     setting.ID = ID
     setting.file = file
     setting.driver = driver or setting.driver
     setting.sqlalchemy_uri = sqlalchemy_uri or setting.sqlalchemy_uri
-    
 
 
 class Connector(object):
@@ -54,44 +54,50 @@ class Connector(object):
         if the argument file is a yaml filename, loading the content as configuration.
         the dictionary or yaml content, which will either passed directly to the underlying DBAPI
         ``connect()`` method as additional keyword arguments, so the dictionary's key should be follow
-        underlying API. 
+        underlying API.
 
     :type file:
         `dict` or `basestring`
 
-        
+
     E.g., Create and use a Connector, configuration read from file named 'db.yaml' and schema ID is 'foo'
-    >>> content = {
+    >>> configuration = {
     ... 'foo': {
     ...     'driver': 'pymssql',
     ...     'config': {'host': 'localhost', 'user': 'bob', 'passwd': '**', 'port': 3306, 'db':'foo'},
-    ...     }
+    ...     },
+    ... 'bar': {
+    ...     'driver': 'pymssql',
+    ...     'config': {'host': 'localhost', 'user': 'bob', 'passwd': '**', 'port': 3306, 'db':'bar'},
+    ...     },
     ... }
     >>> import yaml
     >>> with open('db.yaml', 'w') as fp:
-    ...     yaml.dump(content, fp)
+    ...     yaml.dump(configuration, fp)
     ...
-    >>> base_setting(ID='foo', file='db.yaml')          # set schema ID/configuration file path
+    >>> base_setting(ID='foo', file='db.yaml')     # set schema ID/configuration file path
     >>> connector = Connector()
-    >>> print connector.driver                          # using underlying driver name
-    >>> print connector._connection                     # associated connection object
-    >>> print connector._cursor                         # associated cursor object
-    >>> print connector.connection                      # connection object
-    >>> print connector.cursor()                        # obtains a new cursor object
+    >>> connector.driver                           # using underlying driver name
+    >>> connector._connection                      # associated connection object
+    >>> connector._cursor                          # associated cursor object
+    >>> connector.connection                       # connection object
+    >>> connector.cursor()                         # call cursor factory method to obtains a new cursor object
     >>> from pymysql.cursors import DictCursor
-    >>> print connector.cursor(cursorclass=DictCursor)  # obtains a new customer cursor object
-    >>> connector._cursor.execute('select now();')      # execute sql
-    >>> connector._cursor.fetchall()                    # fetch result
+    >>> connector.cursor(cursorclass=DictCursor)   # obtains a new customer cursor object
+    >>> connector._cursor.execute('select now();') # execute sql
+    >>> connector._cursor.fetchall()               # fetch result
     >>> connector._connection.commit()
     >>> connector.close()
 
     E.g., Auto close connection/Auto commit.
     >>> with Connector() as cursor:                      # Note: with statement return cursor instead of connector
-    >>>    cursor.execute('insert into ...')
+    >>>    cursor.execute('insert into Point(x, y, x) values (1.0, 2.0, 3.0);')
     >>>
     >>> with Connector(ID='bar') as cursor:              # connect to another ID(schema) 'bar'
-    >>>     cursor.execute('insert into ...')
+    >>>     cursor.execute('insert into Point(x, y, x) values (1.0, 2.0, 3.0);')
     >>>
+    >>> with Connector(ID='bar', driver='MySQLdb') as cursor:    # using another driver
+    >>>     cursor.execute('insert into Point(x, y, x) values (1.0, 2.0, 3.0);')
     >>> # get a connection object. driver is optional keyword argument.
     >>> connection = Connector.connect(driver='pymssql', host='localhost', user='bob', passwd='**', port=3306, db='foo')
     >>> # get a sqlalchemy engine
@@ -109,19 +115,16 @@ class Connector(object):
             self.connect_args = file
         else:
             raise TypeError("Unexpected data type in argument file")
-        self.writer = None                                                        # a delegater for writing database
-        self._connection = self.connect(self.driver, **self.connect_args)
-        self._cursor = self._connection.cursor()                                  # associated cursor
+        self.writer = None                                                 # dependency delegator for writing database
+        self._connection = self.connect(self.driver, **self.connect_args)  # associated connection
+        self._cursor = self._connection.cursor()                           # associated cursor
 
     def __enter__(self):
-        return self._cursor                                                       # return the associated cursor
+        return self._cursor
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """commit if successful otherwise rollback"""
-        if exc_type:
-            self.connection.rollback()
-        else:
-            self.connection.commit()
+        self.connection.rollback() if exc_type else self.connection.commit()
         self.close()
         return False
 
@@ -148,36 +151,34 @@ class Connector(object):
 class DBManipulator(Connector):
     """
     This class inherits Connector, used for database I/O.
-
     :param connection: connection object, auto connect if None.
-    
-    
+
     E.g., read from database 'foo' and write to database 'bar'
-    
-    >>> with DBManipulator() as manipulator:                
-    >>>    petl_table = manipulator.fromdb('select * from users')
-    >>>    print petl_table
+    >>> with DBManipulator() as manipulator:
+    >>>    # fetch all data immediately if latency is False, and return a table<? extends petl.util.base.Table>
+    >>>    petl_table = manipulator.fromdb('select * from Point;', latency=False)
+    >>>    petl_table   # shows petl table, see : http://petl.readthedocs.io/en/latest/ for petl detail
     >>>
     >>> manipulator = DBManipulator(ID='bar')
-    >>> manipulator.create_table(petl_table)
-    >>> 
+    >>> manipulator.create_table(petl_table, table_name='Point')
+    >>>
     >>> # write with header table
     >>> table_header = ['x', 'y', 'z']
     >>> table = [table_header, [1.0, 88, 88], [2.0, 88, 88]]
     >>> manipulator.todb(table, table_name='Point', mode='insert')  # default mode is 'insert'
     >>>
-    >>> # write None header table, 
+    >>> # write None header table,
     >>> table = [[1.0, 88, 88], [2.0, 88, 88]]
-    >>> manipulator.todb(table, table_name='Point', mode='replace', with_header=False)  # default with_header is True
+    >>> manipulator.todb(table, table_name='Point', mode='replace', with_header=False)     # default with_header is True
     >>>
     >>> # sliced big table to many sub-table with specified size, 1 sub-table 1 transaction.
     >>> big_table = [[1.0, 88, 88], [2.0, 88, 88] .....]
     >>> manipulator.todb(big_table, table_name='Point', with_header=False, slice_size=128)  # default slice_size is 128
-    >>> 
+    >>>
     >>> # check executeed sql
-    >>> sql = manipulator.writer.make_sql()
-    >>> print sql
-	>>> manipulator.close()
+    >>> sql = manipulator.writer.make_sql() # return a SQL String or Iterator<SQL String>
+    >>> sql if isinstance(sql, basestring) else [s for s in sql] # show sql
+    >>> manipulator.close()
     """
 
     def __init__(self, connection=None, **kwargs):
@@ -290,26 +291,27 @@ class InsertReplaceWriter(Writer):
 
     def make_sql(self):
         if self.header is not None:
-            fields = ', '.join(self.header)
-            values_fmt = ('%s, ' * len(self.header))[:-2]
-            sql = "%s INTO %s (%s) VALUES (%s)" % (self.mode.upper(), self.table_name, fields, values_fmt)
+            fields = u', '.join(self.header)
+            values_fmt = u', '.join(('%s', ) * len(self.header))
+            sql = u"%s INTO %s (%s) VALUES (%s)" % (self.mode.upper(), self.table_name, fields, values_fmt)
         else:
-            values_fmt = ('%s, ' * len(self.content[0]))[:-2]
-            sql = "%s INTO %s VALUES (%s)" % (self.mode.upper(), self.table_name, values_fmt)
+            values_fmt = u', '.join(('%s', ) * len(self.content[0]))
+            sql = u"%s INTO %s VALUES (%s)" % (self.mode.upper(), self.table_name, values_fmt)
         return sql
 
 
 class UpdateDuplicateWriter(Writer):
     def make_sql(self):
-        sql_statement_fmt = "INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s"
+        sql_statement_fmt = u"INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s"
         for row in self.table.dicts():
-            dic = dict((k, v) for k, v in row.items() if v is not None)    
+            dic = dict((k, v) for k, v in row.items() if v is not None)
             keys = dic.keys()
             keys_sql = ', '.join(keys)
-            values_sql = ', '.join(map(lambda v: u"%s" % v if isinstance(v, numbers.Number) else u"'%s'" % v, dic.values()))
-            
+            values_sql = ', '.join(
+                map(lambda v: u"{}".format(v) if isinstance(v, numbers.Number) else u"'{}'".format(v), dic.values()))
             update_keys = [k for k in keys if k not in self.duplicate_key]
-            update_items_sql = ', '.join(map(lambda k: u"%s=%s" % (k, dic[k]) if isinstance(dic[k], numbers.Number) else u"%s='%s'" % (k, dic[k]), update_keys))
+            update_items_sql = ', '.join(map(
+                lambda k: u"{}={}".format(k, dic[k]) if isinstance(dic[k], numbers.Number) else u"{}='{}'".format(k, dic[k]), update_keys))
             yield sql_statement_fmt % (self.table_name, keys_sql, values_sql, update_items_sql)
 
     def write(self):
