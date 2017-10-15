@@ -62,7 +62,6 @@ obtains a connection.
 ```
 >>> from dbman import Connector
 >>> Connector.connect(driver='pymysql', host='localhost', user='bob', passwd='****', port=3306, db='foo') 
->>> 
 ```
 
 ### class ``dbman.Manipulator``(connection=None, **kwargs):
@@ -76,7 +75,7 @@ Write database method.<br />
 :param mode:<br />
     execute SQL INSERT INTO Statement if mode equal to 'insert'.<br />
     execute SQL REPLACE INTO Statement if mode equal to 'replace'.<br />
-    execute SQL INSERT ... ON DUPLICATE KEY UPDATE` Statement if mode equal to 'update'.<br />
+    execute SQL INSERT ... ON DUPLICATE KEY UPDATE` Statement if mode equal to 'update'(only mysql).<br />
     execute SQL TRUNCATE TABLE Statement and then execute SQL INSERT INTO Statement if mode equal to 'truncate'.<br />
 :param duplicate_key: it must be present if the argument mode is 'update', otherwise it will be ignored.<br />
 :param with_header: specify True(default) if the argument table with header, otherwise specify False.<br />
