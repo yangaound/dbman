@@ -55,8 +55,12 @@ Keyword argument `driver` is a package name of underlying database driver that u
 This class used for database I/O. argument `connection` should be a connection object, if `connection` is None, 
 `kwargs` will be passed to `dbman.Connector` to obtains a connection, otherwise wraps the `connection` and ignores `kwargs`
 	
-	fromdb(select_stmt, latency=False, **petl_kwargs)
-```
+    fromdb(select_stmt, latency=False, **petl_kwargs)
+    fetch and wrap all data immediately if latency is `False`
+	```
+	>>> import dbman
+	>>> with dbman.Manipulator() as manipulator:
+	>>> 	table = manipulator.fromdb("select * from Point;")
+	>>>	table
 	
-	
-
+	```
