@@ -2,18 +2,18 @@
 
 
 ### ``dbman.base_setting``(file, ID, driver=None):
-Does basic configuration for this module. 
+	Does basic configuration for this module. 
     
 
 ### class ``dbman.Connector``([file, [ID, [driver]]] ):
-This class obtains and maintains a connection to a database scheme.<br />
-Keyword argument `file` should be a dictionary object or a yaml filename, `basic configuration's file` will be used if it's <br />
-omitted. If the `file` is a yaml filename, loading the content as configuration of a instance. The dictionary or yaml content,<br />
-which will either passed directly to the underlying DBAPI ``connect()`` method as additional keyword arguments, so the <br />
-dictionary's key should be follow underlying API.<br />
-Keyword argument `ID` is a string represents a database schema, `basic configuration's ID` will be used if it's omitted.<br />
-Keyword argument `driver` is a package name of underlying database driver that users want to use. E.g:<br /> 
-`driver` = {'pymysql' | 'MySQLdb' | 'pymssql'}. `basic configuration's driver` will be used if it's omitted.<br />
+	This class obtains and maintains a connection to a database scheme.<br />
+	Keyword argument `file` should be a dictionary object or a yaml filename, `basic configuration's file` will be used if it's <br />
+	omitted. If the `file` is a yaml filename, loading the content as configuration of a instance. The dictionary or yaml content,<br />
+	which will either passed directly to the underlying DBAPI ``connect()`` method as additional keyword arguments, so the <br />
+	dictionary's key should be follow underlying API.<br />
+	Keyword argument `ID` is a string represents a database schema, `basic configuration's ID` will be used if it's omitted.<br />
+	Keyword argument `driver` is a package name of underlying database driver that users want to use. E.g:<br /> 
+	`driver` = {'pymysql' | 'MySQLdb' | 'pymssql'}. `basic configuration's driver` will be used if it's omitted.<br />
 	
 ```
 >>>  # Creates configuration file
@@ -52,7 +52,7 @@ Keyword argument `driver` is a package name of underlying database driver that u
 >>>	   cursor.fetchall()
 ```
 ### Connector.``connect``(driver=None, **kwargs):
-obtains a connection.
+	obtains a connection.
 ```
 >>> from dbman import Connector
 >>> Connector.connect(driver='pymysql', host='localhost', user='bob', passwd='****', port=3306, db='foo') 
@@ -60,22 +60,22 @@ obtains a connection.
 ```
 
 ### class ``dbman.Manipulator``(connection=None, **kwargs):
-This class used for database I/O. argument `connection` should be a connection object, if `connection` is None, 
-`kwargs` will be passed to `dbman.Connector` to obtains a connection, otherwise wraps the `connection` and ignores `kwargs`.
+	This class used for database I/O. argument `connection` should be a connection object, if `connection` is None, 
+	`kwargs` will be passed to `dbman.Connector` to obtains a connection, otherwise wraps the `connection` and ignores `kwargs`.
 
 ### Manipulator.todb(table, table_name, mode='insert', with_header=True, slice_size=128, duplicate_key=())
-"""Write database method.<br />
-:param table: data container, a `petl.util.base.Table` or a sequence like: [header, row1, row2...]. <br />
-:param table_name: the name of a table in this schema.<br />
-:param mode:<br />
-    execute SQL INSERT INTO Statement if mode equal to 'insert'.<br />
-    execute SQL REPLACE INTO Statement if mode equal to 'replace'.<br />
-    execute SQL INSERT ... ON DUPLICATE KEY UPDATE` Statement if mode equal to 'update'.<br />
-    execute SQL TRUNCATE TABLE Statement and then execute SQL INSERT INTO Statement if mode equal to 'truncate'.<br />
-:param duplicate_key: it must be present if the argument mode is 'update', otherwise it will be ignored.<br />
-:param with_header: specify True(default) if the argument table with header, otherwise specify False.<br />
-:param slice_size: the table will be slice to many subtable with slice_size, 1 transaction for 1 subtable.<br />
-:return: affectted row number"""
+	Write database method.<br />
+	:param table: data container, a `petl.util.base.Table` or a sequence like: [header, row1, row2...]. <br />
+	:param table_name: the name of a table in this schema.<br />
+	:param mode:<br />
+	    execute SQL INSERT INTO Statement if mode equal to 'insert'.<br />
+	    execute SQL REPLACE INTO Statement if mode equal to 'replace'.<br />
+	    execute SQL INSERT ... ON DUPLICATE KEY UPDATE` Statement if mode equal to 'update'.<br />
+	    execute SQL TRUNCATE TABLE Statement and then execute SQL INSERT INTO Statement if mode equal to 'truncate'.<br />
+	:param duplicate_key: it must be present if the argument mode is 'update', otherwise it will be ignored.<br />
+	:param with_header: specify True(default) if the argument table with header, otherwise specify False.<br />
+	:param slice_size: the table will be slice to many subtable with slice_size, 1 transaction for 1 subtable.<br />
+	:return: affectted row number
 ```
 >>> from dbman import Manipulator
 >>> 
@@ -110,7 +110,7 @@ This class used for database I/O. argument `connection` should be a connection o
 ```
 	
 ### Manipulator.fromdb(select_stmt, *petl_args, **petl_kwargs)
-"""fetch and wrap all data immediately if latency is `False`"""
+	fetch and wrap all data immediately if latency is `False`
 ```
 >>> from dbman import Manipulator 
 >>> with Manipulator(ID='bar') as manipulator:
