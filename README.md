@@ -2,18 +2,18 @@
 
 
 ### ``dbman.base_setting``(file, ID, driver=None):
-	Does basic configuration for this module. 
+Does basic configuration for this module. 
     
 
 ### class ``dbman.Connector``([file, [ID, [driver]]] ):
-    This class obtains and maintains a connection to a database scheme.<br />
-	Keyword argument `file` should be a dictionary object or a yaml filename, `basic configuration's file` will be used if it's <br />
-	omitted. If the `file` is a yaml filename, loading the content as configuration of a instance. The dictionary or yaml content,<br />
-	which will either passed directly to the underlying DBAPI ``connect()`` method as additional keyword arguments, so the <br />
-	dictionary's key should be follow underlying API.<br />
-    Keyword argument `ID` is a string represents a database schema, `basic configuration's ID` will be used if it's omitted.<br />
-    Keyword argument `driver` is a package name of underlying database driver that users want to use. E.g:<br /> 
-	`driver` = {'pymysql' | 'MySQLdb' | 'pymssql'}. `basic configuration's driver` will be used if it's omitted.<br />
+This class obtains and maintains a connection to a database scheme.<br />
+Keyword argument `file` should be a dictionary object or a yaml filename, `basic configuration's file` will be used if it's <br />
+omitted. If the `file` is a yaml filename, loading the content as configuration of a instance. The dictionary or yaml content,<br />
+which will either passed directly to the underlying DBAPI ``connect()`` method as additional keyword arguments, so the <br />
+dictionary's key should be follow underlying API.<br />
+Keyword argument `ID` is a string represents a database schema, `basic configuration's ID` will be used if it's omitted.<br />
+Keyword argument `driver` is a package name of underlying database driver that users want to use. E.g:<br /> 
+`driver` = {'pymysql' | 'MySQLdb' | 'pymssql'}. `basic configuration's driver` will be used if it's omitted.<br />
 	
 ```
 >>>  # Creates configuration file
@@ -51,3 +51,5 @@
 >>> dbman.Connector.connect(driver='pymysql', host='localhost', user='bob', passwd='****', port=3306, db='foo') 
 ```
 	
+	
+
