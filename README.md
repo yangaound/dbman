@@ -50,6 +50,13 @@ Keyword argument `driver` is a package name of underlying database driver that u
 >>> # new a connection, driver argument is optional
 >>> dbman.Connector.connect(driver='pymysql', host='localhost', user='bob', passwd='****', port=3306, db='foo') 
 ```
+
+### class ``dbman.Manipulator``(connection=None, **kwargs):
+This class used for database I/O. argument `connection` should be a connection object, if `connection` is None, 
+`kwargs` will be passed to `dbman.Connector` to obtains a connection, otherwise wraps the `connection` and ignores `kwargs`
+	
+	fromdb(select_stmt, latency=False, **petl_kwargs)
+```
 	
 	
 
