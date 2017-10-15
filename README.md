@@ -7,11 +7,11 @@ Does basic configuration for this module.
 ```
 >>> configuration = {
 ... 'foo': {
-...     'driver': 'pymssql',
+...     'driver': 'pymysql',
 ...     'config': {'host': 'localhost', 'user': 'bob', 'passwd': '****', 'port': 3306, 'db':'foo'},
 ...     },
 ... 'bar': {
-...     'driver': 'pymssql',
+...     'driver': 'MySQLdb',
 ...     'config': {'host': 'localhost', 'user': 'bob', 'passwd': '****', 'port': 3306, 'db':'bar'},
 ...     },
 ... }
