@@ -52,8 +52,8 @@ Keyword argument `driver` is a package name of underlying database driver that u
 >>> dbman.Connector(file={'host': 'localhost', 'user': 'bob', 'passwd': '****', 'port': 3306, 'db':'foo'}) 
 >>> # with statement Auto close connection/Auto commit. 
 >>> with Connector() as cursor:                # with statement return cursor instead of connector
->>>    cursor.execute('select now();')
->>>	   cursor.fetchall()
+>>>	cursor.execute('select now();')
+>>>	cursor.fetchall()
 ```
 
 ### Connector.``connect``(driver=None, **kwargs):
