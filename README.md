@@ -73,10 +73,10 @@ Write database method.<br />
 :param table: data container, a `petl.util.base.Table` or a sequence like: [header, row1, row2...]. <br />
 :param table_name: the name of a table in this schema.<br />
 :param mode:<br />
-    execute SQL INSERT INTO Statement if mode equal to 'insert'.<br />
-    execute SQL REPLACE INTO Statement if mode equal to 'replace'.<br />
-    execute SQL INSERT ... ON DUPLICATE KEY UPDATE` Statement if mode equal to 'update'(only mysql).<br />
-    execute SQL TRUNCATE TABLE Statement and then execute SQL INSERT INTO Statement if mode equal to 'truncate'.<br />
+	execute SQL INSERT INTO Statement if mode equal to 'insert'.<br />
+	execute SQL REPLACE INTO Statement if mode equal to 'replace'.<br />
+	execute SQL INSERT ... ON DUPLICATE KEY UPDATE` Statement if mode equal to 'update'(only mysql).<br />
+ 	execute SQL TRUNCATE TABLE Statement and then execute SQL INSERT INTO Statement if mode equal to 'truncate'.<br />
 :param duplicate_key: it must be present if the argument mode is 'update', otherwise it will be ignored.<br />
 :param with_header: specify True(default) if the argument table with header, otherwise specify False.<br />
 :param slice_size: the table will be slice to many subtable with slice_size, 1 transaction for 1 subtable.<br />
