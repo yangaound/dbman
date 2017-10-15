@@ -79,7 +79,7 @@ Write database method.<br />
  	execute SQL TRUNCATE TABLE Statement and then execute SQL INSERT INTO Statement if mode equal to 'truncate'.<br />
 :param duplicate_key: it must be present if the argument mode is 'update', otherwise it will be ignored.<br />
 :param with_header: specify True(default) if the argument table with header, otherwise specify False.<br />
-:param slice_size: the table will be slice to many subtable with slice_size, 1 transaction for 1 subtable.<br />
+:param slice_size: the table will be sliced to many subtable with slice_size, 1 transaction for 1 subtable.<br />
 :return: affectted row number
 
 ```
@@ -91,7 +91,7 @@ Write database method.<br />
 >>> manipulator.create_table(table, table_name='Point')  # create table named 'Point' in schema 'bar'
 >>>
 >>> # with header table
->>> table = [table_header, [3, 1, 1], [4, 1, 1]
+>>> table = [['x', 'y'], [3, 1], [4, 1]
 >>> manipulator.todb(table, table_name='Point')
 >>>
 >>> # None header table,
