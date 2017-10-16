@@ -1,8 +1,17 @@
 # dbman
 Pure Python I/O Interface to Database Driver
 
+### class ``dbman.setting``:
+Basic configuration for this module
 
-### ``dbman.base_setting``(file, ID, driver=None):
+### setting.file:
+	a yaml filename 
+### setting.ID:
+	a string represents default database schema
+### setting.driver:
+	a package name of underlying database driver that users want to use
+
+### ``dbman.base_setting``(file, ID=None, driver=None):
 Does basic configuration for this module.
 ```
 >>> configuration = {
@@ -26,13 +35,12 @@ Does basic configuration for this module.
    
 ### class ``dbman.Connector``([file, [ID, [driver]]] ):
 This class obtains and maintains a connection to a database scheme.<br />
-Keyword argument `file` should be a dictionary object or a yaml filename, `basic configuration's file` will be used if it's<br />
-omitted. If the `file` is a yaml filename, loading the content as configuration. The dictionary or yaml content<br />
-which will either passed directly to the underlying DBAPI ``connect()`` method as additional keyword arguments, so the<br />
-dictionary's key should be follow underlying API.<br />
-Keyword argument `ID` is a string represents a database schema, `basic configuration's ID` will be used if it's omitted.<br />
-Keyword argument `driver` is a package name of underlying database driver that users want to use. E.g:<br />
-`driver` = {'pymysql' | 'MySQLdb' | 'pymssql'}. `basic configuration's driver` will be used if it's omitted.<br />
+Keyword argument `file` should be a dictionary object or a yaml filename, `dbman.setting.file` will be used if it's<br />
+omitted. If the `file` is a yaml filename, loading the content as configuration; the dictionary or yaml content<br />
+which will either passed directly to the underlying DBAPI ``connect()`` method as additional keyword arguments.<br />
+Keyword argument `ID` is a string represents a database schema, `dbman.setting.ID` will be used if it's omitted.<br />
+Keyword argument `driver` is a package name of underlying database driver, it values can be
+{'pymysql' | 'MySQLdb' | 'pymssql'}. `dbman.setting.driver` will be used if it's omitted.<br />
 	
 ```
 >>> import dbman
