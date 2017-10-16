@@ -66,7 +66,7 @@ obtains a connection.
 
 ```
 >>> from dbman import Connector
->>> Connector.connect(driver='pymysql', host='localhost', user='bob', passwd='****', port=3306, db='foo') 
+>>> Connector.connect(host='localhost', user='bob', passwd='****', port=3306, db='foo') 
 ```
 
 ### class ``dbman.Manipulator``(connection=None, **kwargs):
