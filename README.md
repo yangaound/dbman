@@ -61,7 +61,7 @@ Keyword argument `driver` is a package name of underlying database driver, it va
 >>>	cursor.fetchall()
 ```
 
-### Connector.``connect``(driver=None, **kwargs):
+### Connector.``connect``(driver=setting.driver, **kwargs):
 obtains a connection.
 
 ```
