@@ -53,7 +53,7 @@ class Connector(object):
     This class obtains and maintains a connection to a database scheme.
 
     :param file:
-        a yaml filename or a dictionary object, `setting.filename` will be used if it's omitted.
+        a yaml filename or a dictionary object, `setting.file` will be used if it's omitted.
         if the argument file is a yaml filename, loading the content as configuration.
         the dictionary or yaml content, which will either passed directly to the underlying DBAPI
         ``connect()`` method as additional keyword arguments.
@@ -62,7 +62,9 @@ class Connector(object):
     :param driver: package name of underlying database driver that users want to use.
     :type driver: str` = {'pymysql' | 'MySQLdb' | 'pymssql'}
     """
-    def __init__(self, file=setting.file, ID=setting.ID, driver=None, ):
+    def __init__(self, file=None, ID=None, driver=None, ):
+        file = file or setting.file
+        ID = ID or setting.ID
         if isinstance(file, basestring):
             with open(file) as f:
                 yaml_obj = yaml.load(f)
@@ -110,7 +112,7 @@ class Manipulator(Connector):
     """
     This class used for database I/O.
     :param connection: a connection object.
-    :param kwargs: if connection is None, kwargs will be passed to  ``dbman.Connector`` to obtains a connection, otherwise ignores it.
+    :param kwargs: if connection is None, kwargs will be passed to  ``dbman.Connector`` to obtains a connection, otherwise it will be ignored.
     """
 
     def __init__(self, connection=None, **kwargs):
@@ -150,7 +152,7 @@ class Manipulator(Connector):
         if mode == 'truncate':
             self.cursor().execute("TRUNCATE TABLE %s" % kwargs['table_name'])
             kwargs.update(mode='insert')
-        if (mode == 'update') and ('MYSQL' in self.driver.upper()):
+        if (mode == 'update') and self.driver and ('MYSQL' in self.driver.upper()):
             self.writer = UpdateDuplicateWriter(self.connection, **kwargs)
         elif mode in ('insert', 'replace'):
             self.writer = InsertReplaceWriter(self.connection, **kwargs)
