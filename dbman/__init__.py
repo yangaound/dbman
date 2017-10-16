@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Created on 2016年12月10日
+Source:
+    https://github.com/yangaound/dbman
+
+Created on 2016年12月24日
 
 @author: albin
 """
@@ -11,100 +14,55 @@ import abc
 import yaml
 import petl
 
-try:
-    import sqlalchemy
-except ImportError:
-    sqlalchemy = None
-
 
 class setting:
     ID = None
     file = None
     driver = None
-    sqlalchemy_uri = None
 
 
-def base_setting(ID, file, driver=None, sqlalchemy_uri=None):
+def base_setting(file, ID=None, driver=None, ):
     """
-    :param ID: a string represents a database schema.
-    :param file: a yaml filename users configuration.
-    :param driver: driver: package name of underlying database driver. `str`={'pymysql' | 'MySQLdb' | 'pymssql'}
-    :param sqlalchemy_uri: user for create a sqlalchemy engine
+    Does basic configuration for this module object.
+
+    E.g.,
+    >>> configuration = {
+    ... 'foo': {
+    ...     'driver': 'pymysql',
+    ...     'config': {'host': 'localhost', 'user': 'bob', 'passwd': '****', 'port': 3306, 'db':'foo'},
+    ...     },
+    ... 'bar': {
+    ...     'driver': 'MySQLdb',
+    ...     'config': {'host': 'localhost', 'user': 'bob', 'passwd': '****', 'port': 3306, 'db':'bar'},
+    ...     },
+    ... }
+    >>> import yaml
+    >>> with open('dbconfig.yaml', 'w') as fp:
+    ...     yaml.dump(configuration, fp)
+    ...
+    >>> import dbman
+    >>> dbman.base_setting(file='dbconfig.yaml', )
     """
-    setting.ID = ID
     setting.file = file
+    setting.ID = ID or setting.ID
     setting.driver = driver or setting.driver
-    setting.sqlalchemy_uri = sqlalchemy_uri or setting.sqlalchemy_uri
 
 
 class Connector(object):
     """
     This class obtains and maintains a connection to a database scheme.
 
-    :param ID: a string represents a database schema in users configuration file,
-        `setting.ID` will be used if it's omitted.
-
-    :param driver:
-        package name of underlying database driver that users want to use.
-    :type driver:
-        `str` = {'pymysql' | 'MySQLdb' | 'pymssql'}
-
     :param file:
         a yaml filename or a dictionary object, `setting.filename` will be used if it's omitted.
         if the argument file is a yaml filename, loading the content as configuration.
         the dictionary or yaml content, which will either passed directly to the underlying DBAPI
-        ``connect()`` method as additional keyword arguments, so the dictionary's key should be follow
-        underlying API.
-
-    :type file:
-        `dict` or `basestring`
-
-
-    E.g., Create and use a Connector, configuration read from file named 'db.yaml' and schema ID is 'foo'
-    >>> configuration = {
-    ... 'foo': {
-    ...     'driver': 'pymssql',
-    ...     'config': {'host': 'localhost', 'user': 'bob', 'passwd': '**', 'port': 3306, 'db':'foo'},
-    ...     },
-    ... 'bar': {
-    ...     'driver': 'pymssql',
-    ...     'config': {'host': 'localhost', 'user': 'bob', 'passwd': '**', 'port': 3306, 'db':'bar'},
-    ...     },
-    ... }
-    >>> import yaml
-    >>> with open('db.yaml', 'w') as fp:
-    ...     yaml.dump(configuration, fp)
-    ...
-    >>> base_setting(ID='foo', file='db.yaml')     # set schema ID/configuration file path
-    >>> connector = Connector()
-    >>> connector.driver                           # using underlying driver name
-    >>> connector._connection                      # associated connection object
-    >>> connector._cursor                          # associated cursor object
-    >>> connector.connection                       # connection object
-    >>> connector.cursor()                         # call cursor factory method to obtains a new cursor object
-    >>> from pymysql.cursors import DictCursor
-    >>> connector.cursor(cursorclass=DictCursor)   # obtains a new customer cursor object
-    >>> connector._cursor.execute('select now();') # execute sql
-    >>> connector._cursor.fetchall()               # fetch result
-    >>> connector._connection.commit()
-    >>> connector.close()
-
-    E.g., Auto close connection/Auto commit.
-    >>> with Connector() as cursor:                      # Note: with statement return cursor instead of connector
-    >>>    cursor.execute('insert into Point(x, y, x) values (1.0, 2.0, 3.0);')
-    >>>
-    >>> with Connector(ID='bar') as cursor:              # connect to another ID(schema) 'bar'
-    >>>     cursor.execute('insert into Point(x, y, x) values (1.0, 2.0, 3.0);')
-    >>>
-    >>> with Connector(ID='bar', driver='MySQLdb') as cursor:    # using another driver
-    >>>     cursor.execute('insert into Point(x, y, x) values (1.0, 2.0, 3.0);')
-    >>> # get a connection object. driver is optional keyword argument.
-    >>> connection = Connector.connect(driver='pymssql', host='localhost', user='bob', passwd='**', port=3306, db='foo')
-    >>> # get a sqlalchemy engine
-    >>> engine = make_sqlalchemy_engine(sqlalchemy_uri='mysql+mysqldb://bob:**@localhost/foo')
+        ``connect()`` method as additional keyword arguments.
+    :type file: `dict` or `basestring`
+    :param ID: a string represents a database schema, `setting.ID` will be used if it's omitted.
+    :param driver: package name of underlying database driver that users want to use.
+    :type driver: str` = {'pymysql' | 'MySQLdb' | 'pymssql'}
     """
-
-    def __init__(self, ID=setting.ID, file=setting.file, driver=None, ):
+    def __init__(self, file=setting.file, ID=setting.ID, driver=None, ):
         if isinstance(file, basestring):
             with open(file) as f:
                 yaml_obj = yaml.load(f)
@@ -114,7 +72,7 @@ class Connector(object):
             self.driver = driver or setting.driver
             self.connect_args = file
         else:
-            raise TypeError("Unexpected data type in argument file")
+            raise TypeError("Unexpected data type in argument 'file'")
         self.writer = None                                                 # dependency delegator for writing database
         self._connection = self.connect(self.driver, **self.connect_args)  # associated connection
         self._cursor = self._connection.cursor()                           # associated cursor
@@ -148,42 +106,16 @@ class Connector(object):
         self._connection.close()
 
 
-class DBManipulator(Connector):
+class Manipulator(Connector):
     """
-    This class inherits Connector, used for database I/O.
-    :param connection: connection object, auto connect if None.
-
-    E.g., read from database 'foo' and write to database 'bar'
-    >>> with DBManipulator() as manipulator:
-    >>>    # fetch all data immediately if latency is False, and return a table<? extends petl.util.base.Table>
-    >>>    petl_table = manipulator.fromdb('select * from Point;', latency=False)
-    >>>    petl_table   # shows petl table, see : http://petl.readthedocs.io/en/latest/ for petl detail
-    >>>
-    >>> manipulator = DBManipulator(ID='bar')
-    >>> manipulator.create_table(petl_table, table_name='Point')
-    >>>
-    >>> # write with header table
-    >>> table_header = ['x', 'y', 'z']
-    >>> table = [table_header, [1.0, 88, 88], [2.0, 88, 88]]
-    >>> manipulator.todb(table, table_name='Point', mode='insert')  # default mode is 'insert'
-    >>>
-    >>> # write None header table,
-    >>> table = [[1.0, 88, 88], [2.0, 88, 88]]
-    >>> manipulator.todb(table, table_name='Point', mode='replace', with_header=False)     # default with_header is True
-    >>>
-    >>> # sliced big table to many sub-table with specified size, 1 sub-table 1 transaction.
-    >>> big_table = [[1.0, 88, 88], [2.0, 88, 88] .....]
-    >>> manipulator.todb(big_table, table_name='Point', with_header=False, slice_size=128)  # default slice_size is 128
-    >>>
-    >>> # check executeed sql
-    >>> sql = manipulator.writer.make_sql() # return a SQL String or Iterator<SQL String>
-    >>> sql if isinstance(sql, basestring) else [s for s in sql] # show sql
-    >>> manipulator.close()
+    This class used for database I/O.
+    :param connection: a connection object.
+    :param kwargs: if connection is None, kwargs will be passed to  ``dbman.Connector`` to obtains a connection, otherwise ignores it.
     """
 
     def __init__(self, connection=None, **kwargs):
         if connection is None:
-            super(DBManipulator, self).__init__(**kwargs)
+            super(Manipulator, self).__init__(**kwargs)
         else:
             self._connection = connection
 
@@ -199,7 +131,7 @@ class DBManipulator(Connector):
     def todb(self, table, table_name, mode='insert', with_header=True, slice_size=128, duplicate_key=()):
         """
         :param table: data container, a `petl.util.base.Table` or a sequence like: [header, row1, row2...].
-        :param table_name: the name of a table in this schema.
+        :param table_name: the name of a table in this ID.
         :param mode:
             execute SQL INSERT INTO Statement if mode equal to 'insert'.
             execute SQL REPLACE INTO Statement if mode equal to 'replace'.
@@ -218,10 +150,12 @@ class DBManipulator(Connector):
         if mode == 'truncate':
             self.cursor().execute("TRUNCATE TABLE %s" % kwargs['table_name'])
             kwargs.update(mode='insert')
-        if mode == 'update':
+        if (mode == 'update') and ('MYSQL' in self.driver.upper()):
             self.writer = UpdateDuplicateWriter(self.connection, **kwargs)
-        else:
+        elif mode in ('insert', 'replace'):
             self.writer = InsertReplaceWriter(self.connection, **kwargs)
+        else:
+            raise RuntimeError("The driver '%s' can't handle this request" % self.driver)
         return self.writer
 
     def create_table(self, table, table_name, **petl_kwargs):
@@ -308,8 +242,8 @@ class UpdateDuplicateWriter(Writer):
             dic = dict((k, v) for k, v in row.items() if v is not None)
             keys = dic.keys()
             keys_sql = ', '.join(keys)
-            values_sql = ', '.join(
-                map(lambda v: u"{}".format(v) if isinstance(v, numbers.Number) else u"'{}'".format(v), dic.values()))
+            values_sql = ', '.join(map(
+                lambda v: u"{}".format(v) if isinstance(v, numbers.Number) else u"'{}'".format(v), dic.values()))
             update_keys = [k for k in keys if k not in self.duplicate_key]
             update_items_sql = ', '.join(map(
                 lambda k: u"{}={}".format(k, dic[k]) if isinstance(dic[k], numbers.Number) else u"{}='{}'".format(k, dic[k]), update_keys))
@@ -317,7 +251,7 @@ class UpdateDuplicateWriter(Writer):
 
     def write(self):
         if not self.duplicate_key:
-            raise ValueError('argument duplicate_key is not specified')
+            raise ValueError('Argument duplicate_key is not specified')
         cursor = self.connection.cursor()
         affected_row_count = 0
         for i, sql in enumerate(self.make_sql()):
@@ -328,6 +262,3 @@ class UpdateDuplicateWriter(Writer):
         self.connection.commit()
         return affected_row_count
 
-
-def make_sqlalchemy_engine(sqlalchemy_uri=setting.sqlalchemy_uri, **kwargs):
-    return sqlalchemy.create_engine(sqlalchemy_uri, **kwargs)
