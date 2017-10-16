@@ -4,9 +4,10 @@ Pure Python I/O Interface to Database Driver
 ### class ``dbman.setting``:
 Basic configuration for this module
 
-### setting.file: a yaml filename 
-### setting.ID: a string represents default database schema
-### setting.driver: a package name of underlying database driver that users want to use
+#### setting.file:
+##### a yaml filename 
+#### setting.ID: a string represents default database schema
+#### setting.driver: a package name of underlying database driver that users want to use
 
 ### ``dbman.base_setting``(file, ID=None, driver=None):
 Does basic configuration for this module.
