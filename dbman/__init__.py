@@ -18,7 +18,7 @@ import petl
 class setting:
     ID = None
     file = None
-    driver = None
+    driver = 'pymysql'
 
 
 def base_setting(file, ID=None, driver=None, ):
@@ -44,31 +44,31 @@ def base_setting(file, ID=None, driver=None, ):
     >>> dbman.base_setting(file='dbconfig.yaml', )
     """
     setting.file = file
-    setting.ID = ID or setting.ID
+    setting.ID = ID
     setting.driver = driver or setting.driver
 
 
 class Connector(object):
-    """
-    This class obtains and maintains a connection to a database scheme.
+    """ This class obtains and maintains a connection to a schema"""
 
-    :param file:
-        a yaml filename or a dictionary object, `setting.file` will be used if it's omitted.
-        if the argument file is a yaml filename, loading the content as configuration.
-        the dictionary or yaml content, which will either passed directly to the underlying DBAPI
-        ``connect()`` method as additional keyword arguments.
-    :type file: `dict` or `basestring`
-    :param ID: a string represents a database schema, `setting.ID` will be used if it's omitted.
-    :param driver: package name of underlying database driver that users want to use.
-    :type driver: str` = {'pymysql' | 'MySQLdb' | 'pymssql'}
-    """
     def __init__(self, file=None, ID=None, driver=None, ):
+        """   
+        :param file:
+            a yaml filename or a dictionary object, `setting.file` will be used if it's omitted.
+            if the argument file is a yaml filename, loading the content as configuration.
+            the dictionary or yaml content, which will either passed directly to the underlying DBAPI
+            ``connect()`` method as additional keyword arguments.
+        :type file: `dict` or `basestring`
+        :param ID: a string represents a schema, `setting.ID` will be used if it's omitted.
+        :param driver: package name of underlying database driver that clients want to use, `pymysql` will be assumed if it's omitted.
+        :type driver: str` = {'pymysql' | 'MySQLdb' | 'pymssql'}
+        """
         file = file or setting.file
         ID = ID or setting.ID
         if isinstance(file, basestring):
             with open(file) as f:
                 yaml_obj = yaml.load(f)
-            self.driver = driver or yaml_obj[ID].get('driver') or setting.driver  # driver name
+            self.driver = yaml_obj[ID].get('driver') or driver or setting.driver  # driver name
             self.connect_args = yaml_obj[ID]['config']
         elif isinstance(file, dict):
             self.driver = driver or setting.driver
@@ -89,7 +89,8 @@ class Connector(object):
         return False
 
     @staticmethod
-    def connect(driver=setting.driver, **connect_kwargs):
+    def connect(driver=None, **connect_kwargs):
+        driver = driver or setting.driver
         driver in globals() or globals().update({driver: __import__(driver)})
         return globals()[driver].connect(**connect_kwargs)
 
@@ -109,106 +110,106 @@ class Connector(object):
 
 
 class Manipulator(Connector):
-    """
-    This class used for database I/O.
-    :param connection: a connection object.
-    :param kwargs: if connection is None, kwargs will be passed to  ``dbman.Connector`` to obtains a connection, otherwise it will be ignored.
-    """
+    """This class inherits `dbman.Connector and add 2 methods: `fromdb` for read and `todb` for write"""
 
-    def __init__(self, connection=None, **kwargs):
+    def __init__(self, connection=None, driver=None, **kwargs):
+        """    
+        :param connection: a connection object.
+        :param driver: package name of underlying database driver that users want to use, `pymysql` will be assumed if it's omitted.
+        :param kwargs: if `connection` is `None`, `kwargs` will be passed to `dbman.Connector`` to obtains a connection, 
+            otherwise it will be ignored.
+        """
         if connection is None:
-            super(Manipulator, self).__init__(**kwargs)
+            super(Manipulator, self).__init__(driver=driver, **kwargs)
         else:
+            self.driver = driver or setting.driver
             self._connection = connection
 
     def __enter__(self):
         """overwrite"""
         return self
 
-    def fromdb(self, select_stmt, latency=False, **petl_kwargs):
-        """fetch and wrap all data immediately if latency is False"""
-        temp = petl.fromdb(self.connection, select_stmt, **petl_kwargs)
-        return temp if (isinstance(latency, bool) and latency) else petl.wrap([row for row in temp])
+    def fromdb(self, select_stmt, args=None, latency=False):
+        """argument `select_stmt` and `args` will be passed to the underlying API `cursor.execute()`.
+        fetch and wraps all data immediately if the optional keyword argument `latency` is `True`
+        """
+        temp = petl.fromdb(self.connection, select_stmt, args)
+        return temp if latency else petl.wrap([row for row in temp])
 
     def todb(self, table, table_name, mode='insert', with_header=True, slice_size=128, duplicate_key=()):
         """
-        :param table: data container, a `petl.util.base.Table` or a sequence like: [header, row1, row2...].
+        :param table: data container, a `petl.util.base.Table` or a sequence like: [header, row1, row2, ...] or [row1, row2, ...]
         :param table_name: the name of a table in this ID.
         :param mode:
-            execute SQL INSERT INTO Statement if mode equal to 'insert'.
-            execute SQL REPLACE INTO Statement if mode equal to 'replace'.
-            execute SQL INSERT ... ON DUPLICATE KEY UPDATE Statement if mode equal to 'update'.
-            execute SQL TRUNCATE TABLE Statement and then execute SQL INSERT INTO Statement if mode equal to 'truncate'.
-        :param duplicate_key: it must be present if the argument mode is 'update', otherwise it will be ignored.
-        :param with_header: specify True(default) if the argument table with header, otherwise specify False.
-        :param slice_size: the table will be slice to many subtable with slice_size, 1 transaction for 1 subtable.
+            execute SQL INSERT INTO Statement if `mode` equal to 'insert'.
+            execute SQL REPLACE INTO Statement if `mode` equal to 'replace'.
+            execute SQL INSERT ... ON DUPLICATE KEY UPDATE Statement if `mode` equal to 'update'.
+            execute SQL TRUNCATE TABLE Statement and then execute SQL INSERT INTO Statement if `mode` equal to 'truncate'.
+            create a table and insert data into it if `mode` equal to 'create'.
+        :param duplicate_key: it must be present if the argument `mode` is 'update', otherwise it will be ignored.
+        :param with_header: specify `True` if the argument `table` with header, otherwise specify `False`.
+        :param slice_size: the `table` will be slice to many subtable with `slice_size`, 1 transaction for 1 subtable.
         """
-        self.make_writer(table=table, table_name=table_name, mode=mode, with_header=with_header, slice_size=slice_size,
-                         duplicate_key=duplicate_key)
-        return self.writer.write()
+        if mode == 'create':
+            return self._create_table(table, table_name=table_name)
+        else:
+            self._make_writer(table=table, table_name=table_name, mode=mode, with_header=with_header, slice_size=slice_size, 
+                    duplicate_key=duplicate_key)
+            return self.writer.write()
 
-    def make_writer(self, **kwargs):
+    def _make_writer(self, **kwargs):
+        kwargs.update(connection=self.connection)
         mode = kwargs.get('mode')
         if mode == 'truncate':
-            self.cursor().execute("TRUNCATE TABLE %s" % kwargs['table_name'])
+            self.cursor().execute("TRUNCATE TABLE `%(table_name)s`;", kwargs)
             kwargs.update(mode='insert')
         if (mode == 'update') and self.driver and ('MYSQL' in self.driver.upper()):
-            self.writer = UpdateDuplicateWriter(self.connection, **kwargs)
+            self.writer = _UpdateDuplicateWriter(**kwargs)
         elif mode in ('insert', 'replace'):
-            self.writer = InsertReplaceWriter(self.connection, **kwargs)
+            self.writer = _InsertReplaceWriter(**kwargs)
         else:
             raise RuntimeError("The driver '%s' can't handle this request" % self.driver)
         return self.writer
 
-    def create_table(self, table, table_name, **petl_kwargs):
+    def _create_table(self, table, table_name, **petl_kwargs):
         if self.driver and ('MYSQL' in self.driver.upper()):
             self.cursor().execute('SET SQL_MODE=ANSI_QUOTES')
         petl.todb(table, self.connection, table_name, create=True, **petl_kwargs)
-        return table.nrows()
 
 
-class Writer(object):
+class _Writer(object):
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, connection, table, table_name, with_header=True, mode='insert', slice_size=128, duplicate_key=()):
-        if mode.upper() not in ('INSERT', 'REPLACE', 'UPDATE'):
-            raise ValueError("Invalid mode, it's should be: {'insert' | 'replace' | 'update'}")
+    def __init__(self, connection, table_name, mode='insert', slice_size=128):
         self.connection = connection
-        self.table = self.convert2table(table)
         self.table_name = table_name
-        if with_header:
-            self.header = self.table.header()
-            self.content = self.table.skip(1).tuple()
-            self.row_count = self.table.nrows()
-        else:
-            self.header = None
-            self.content = self.table.tuple()
-            self.row_count = self.table.nrows() + 1
         self.mode = mode
         self.slice_size = slice_size
-        self.duplicate_key = duplicate_key
-
-    @staticmethod
-    def convert2table(sequence):
-        if isinstance(sequence, petl.util.base.Table):
-            return sequence
-        if isinstance(sequence, (list, tuple)) and isinstance(sequence[0], (list, tuple)):
-            return petl.wrap(sequence)
-        raise TypeError('Unexpected data type in table, it should be `petl.util.base.Table` or `sequence`')
-
-    @abc.abstractmethod
-    def write(self):
-        """load content to database"""
 
     @abc.abstractmethod
     def make_sql(self):
-        """:return SQL statement or Iterator<SQL statement>"""
+        """:return Iterator<SQL statement>"""
+        
+    @abc.abstractmethod
+    def write(self):
+        """load data to database"""
 
 
-class InsertReplaceWriter(Writer):
+class _InsertReplaceWriter(_Writer):
+    def __init__(self, table, with_header=True, **kwargs):
+        sequence = table.tuple() if isinstance(table, petl.util.base.Table) else table
+        if with_header:
+            self.header = sequence[0]
+            self.content = sequence[1:]
+        else:
+            self.header = None
+            self.content = sequence
+        self.row_count = len(self.content)
+        super(_InsertReplaceWriter, self).__init__(**kwargs)
+    
     def write(self):
         cursor = self.connection.cursor()
-        sql = self.make_sql()
+        sql = self.make_sql().next()
         affected_row_count = 0
         for sub_table in self.slice_table():
             num = cursor.executemany(sql, sub_table)
@@ -234,13 +235,20 @@ class InsertReplaceWriter(Writer):
         else:
             values_fmt = u', '.join(('%s', ) * len(self.content[0]))
             sql = u"%s INTO %s VALUES (%s)" % (self.mode.upper(), self.table_name, values_fmt)
-        return sql
+        yield sql
 
 
-class UpdateDuplicateWriter(Writer):
+class _UpdateDuplicateWriter(_Writer):
+    def __init__(self, table, with_header, duplicate_key, **kwargs):
+        if not duplicate_key or not with_header:
+            raise ValueError('Argument duplicate_key is not specified or argument table with not header')
+        self.duplicate_key = duplicate_key
+        self.content = table if isinstance(table, petl.util.base.Table) else petl.wrap(table)
+        super(_UpdateDuplicateWriter, self).__init__(**kwargs)
+
     def make_sql(self):
         sql_statement_fmt = u"INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s"
-        for row in self.table.dicts():
+        for row in self.content.dicts():
             dic = dict((k, v) for k, v in row.items() if v is not None)
             keys = dic.keys()
             keys_sql = ', '.join(keys)
@@ -252,8 +260,6 @@ class UpdateDuplicateWriter(Writer):
             yield sql_statement_fmt % (self.table_name, keys_sql, values_sql, update_items_sql)
 
     def write(self):
-        if not self.duplicate_key:
-            raise ValueError('Argument duplicate_key is not specified')
         cursor = self.connection.cursor()
         affected_row_count = 0
         for i, sql in enumerate(self.make_sql()):
@@ -263,4 +269,3 @@ class UpdateDuplicateWriter(Writer):
             affected_row_count += (num or 0)
         self.connection.commit()
         return affected_row_count
-
