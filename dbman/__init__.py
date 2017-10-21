@@ -180,10 +180,12 @@ class Manipulator(Connector):
 class _Writer(object):
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, connection, table_name, mode='insert', slice_size=128):
+    def __init__(self, connection, table_name, with_header, mode, slice_size, duplicate_key):
         self.connection = connection
         self.table_name = table_name
+        self.with_header = with_header
         self.mode = mode
+        self.duplicate_key = duplicate_key
         self.slice_size = slice_size
 
     @abc.abstractmethod
@@ -196,16 +198,16 @@ class _Writer(object):
 
 
 class _InsertReplaceWriter(_Writer):
-    def __init__(self, table, with_header=True, **kwargs):
+    def __init__(self, table, **kwargs):
+        super(_InsertReplaceWriter, self).__init__(**kwargs)
         sequence = table.tuple() if isinstance(table, petl.util.base.Table) else table
-        if with_header:
+        if self.with_header:
             self.header = sequence[0]
             self.content = sequence[1:]
         else:
             self.header = None
             self.content = sequence
         self.row_count = len(self.content)
-        super(_InsertReplaceWriter, self).__init__(**kwargs)
     
     def write(self):
         cursor = self.connection.cursor()
@@ -239,12 +241,11 @@ class _InsertReplaceWriter(_Writer):
 
 
 class _UpdateDuplicateWriter(_Writer):
-    def __init__(self, table, with_header, duplicate_key, **kwargs):
-        if not duplicate_key or not with_header:
-            raise ValueError('Argument duplicate_key is not specified or argument table with not header')
-        self.duplicate_key = duplicate_key
-        self.content = table if isinstance(table, petl.util.base.Table) else petl.wrap(table)
+    def __init__(self, table, **kwargs):
         super(_UpdateDuplicateWriter, self).__init__(**kwargs)
+        if not self.duplicate_key or not self.with_header:
+            raise ValueError('Argument duplicate_key is not specified or argument table with not header')
+        self.content = table if isinstance(table, petl.util.base.Table) else petl.wrap(table)
 
     def make_sql(self):
         sql_statement_fmt = u"INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s"
