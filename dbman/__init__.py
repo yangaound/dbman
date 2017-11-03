@@ -1,273 +1,268 @@
 # -*- coding: utf-8 -*-
-"""
+'''
 Source:
-    https://github.com/yangaound/dbman
+    https://github.com/yangaound/xmlutil
 
 Created on 2016年12月24日
 
 @author: albin
-"""
+'''
 
-import numbers
+import re
 import abc
+from collections import defaultdict
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 
-import yaml
 import petl
+try:
+    from lxml import etree
+except ImportError:
+    from xml.etree import cElementTree as etree
+except ImportError:
+    from xml.etree import ElementTree as etree
+
+__version__ = '1.0.0'
+
+namespace_pattern = re.compile(r"{.+}")
 
 
-class setting:
-    db_label = None
-    db_config = None
-    driver = 'pymysql'
+def parse(filename, *args, **kwargs):
+    element = etree.parse(filename, *args, **kwargs).getroot()
+    return XMLNode(element)
 
 
-def base_setting(db_config, db_label=None, driver=None, ):
-    """
-    Does basic configuration for this module.
-
-    E.g.,
-    >>> configuration = {
-    ... 'foo': {
-    ...     'driver': 'pymysql',
-    ...     'config': {'host': 'localhost', 'user': 'bob', 'passwd': '****', 'port': 3306, 'db':'foo'},
-    ...     },
-    ... 'bar': {
-    ...     'driver': 'MySQLdb',
-    ...     'config': {'host': 'localhost', 'user': 'bob', 'passwd': '****', 'port': 3306, 'db':'bar'},
-    ...     },
-    ... }
-    >>> import yaml
-    >>> with open('dbconfig.yaml', 'w') as fp:
-    ...     yaml.dump(configuration, fp)
-    ...
-    >>> import dbman
-    >>> dbman.base_setting(db_config='dbconfig.yaml', db_label='foo')
-    """
-    setting.db_config = db_config
-    setting.db_label = db_label
-    setting.driver = driver or setting.driver
+def get_tag(element):
+    """return the element's local name"""
+    return re.sub(namespace_pattern, '', element.tag)
 
 
-class Connector(object):
-    """ This class obtains and maintains a connection to a schema"""
-
-    def __init__(self, db_config=None, db_label=None, driver=None, ):
-        """   
-        :param db_config:
-            a yaml filename or a dictionary object, `setting.db_config` will be used if it's omitted.
-            if the argument `db_config` is a yaml filename, loading the content as configuration.
-            the dictionary or yaml content, which will either passed to the underlying DBAPI
-            ``connect()`` method as additional keyword arguments.
-        :type db_config: `dict` or `basestring`
-        :param db_label: a string represents a schema, `setting.db_label` will be used if it's omitted.
-        :param driver: package name of underlying database driver that clients want to use, `pymysql` will be assumed if it's omitted.
-        :type driver: str` = {'pymysql' | 'MySQLdb' | 'pymssql'}
-        """
-        db_config = db_config or setting.db_config
-        db_label = db_label or setting.db_label
-        if isinstance(db_config, basestring):
-            with open(db_config) as f:
-                yaml_obj = yaml.load(f)
-            self.driver = yaml_obj[db_label].get('driver') or driver or setting.driver  # driver name
-            self.connect_args = yaml_obj[db_label]['config']
-        elif isinstance(db_config, dict):
-            self.driver = driver or setting.driver
-            self.connect_args = db_config
-        else:
-            raise TypeError("Unexpected data type in argument 'db_config'")
-        self.writer = None                                                 # dependency delegator for writing database
-        self._connection = self.connect(self.driver, **self.connect_args)  # associated connection
-        self._cursor = self._connection.cursor()                           # associated cursor
-
-    def __enter__(self):
-        """with statement return cursor instead of connector"""
-        return self._cursor
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """commit if successful otherwise rollback"""
-        self.connection.rollback() if exc_type else self.connection.commit()
-        self.close()
-        return False
-
-    @staticmethod
-    def connect(driver=None, **connect_kwargs):
-        driver = driver or setting.driver
-        driver in globals() or globals().update({driver: __import__(driver)})
-        return globals()[driver].connect(**connect_kwargs)
-
-    @property
-    def connection(self):
-        if hasattr(self._connection, 'open') and not self._connection.open:
-            self._connection = self.connect(self.driver, **self.connect_args)
-        return self._connection
-
-    def cursor(self, **kwargs):
-        """cursor factory method"""
-        return self.connection.cursor(**kwargs)
-
-    def close(self):
-        self._cursor.close()
-        self._connection.close()
+def get_namespace(element):
+    """return the element's namespace"""
+    return re.sub(get_tag(element), '', element.tag)
 
 
-class Manipulator(Connector):
-    """This class inherits `dbman.Connector and add 2 methods: `fromdb` for read and `todb` for write"""
-
-    def __init__(self, connection=None, driver=None, **kwargs):
-        """    
-        :param connection: a connection object.
-        :param driver: package name of underlying database driver that users want to use, `pymysql` will be assumed if it's omitted.
-        :param kwargs: if `connection` is `None`, `kwargs` will be passed to `dbman.Connector`` to obtains a connection, 
-            otherwise it will be ignored.
-        """
-        if connection is None:
-            super(Manipulator, self).__init__(driver=driver, **kwargs)
-        else:
-            self.driver = driver or setting.driver
-            self._connection = connection
-
-    def __enter__(self):
-        """overwrite"""
-        return self
-
-    def fromdb(self, select_stmt, args=None, latency=False):
-        """argument `select_stmt` and `args` will be passed to the underlying API `cursor.execute()`.
-        fetch and wraps all data immediately if the optional keyword argument `latency` is `True`
-        """
-        temp = petl.fromdb(self.connection, select_stmt, args)
-        return temp if latency else petl.wrap([row for row in temp])
-
-    def todb(self, table, table_name, mode='insert', with_header=True, slice_size=128, duplicate_key=()):
-        """
-        :param table: data container, a `petl.util.base.Table` or a sequence like: [header, row1, row2, ...] or [row1, row2, ...]
-        :param table_name: the name of a table in this database
-        :param mode:
-            execute SQL INSERT INTO Statement if `mode` equal to 'insert'.
-            execute SQL REPLACE INTO Statement if `mode` equal to 'replace'.
-            execute SQL INSERT ... ON DUPLICATE KEY UPDATE Statement if `mode` equal to 'update'.
-            execute SQL TRUNCATE TABLE Statement and then execute SQL INSERT INTO Statement if `mode` equal to 'truncate'.
-            create a table and insert data into it if `mode` equal to 'create'.
-        :param duplicate_key: it must be present if the argument `mode` is 'update', otherwise it will be ignored.
-        :param with_header: specify `True` if the argument `table` with header, otherwise specify `False`.
-        :param slice_size: the `table` will be slice to many subtable with `slice_size`, 1 transaction for 1 subtable.
-        """
-        if mode == 'create':
-            return self._create_table(table, table_name=table_name)
-        else:
-            self._make_writer(table=table, table_name=table_name, mode=mode, with_header=with_header, slice_size=slice_size, 
-                    duplicate_key=duplicate_key)
-            return self.writer.write()
-
-    def _make_writer(self, **kwargs):
-        kwargs.update(connection=self.connection)
-        mode = kwargs.get('mode')
-        if mode == 'truncate':
-            self.cursor().execute("TRUNCATE TABLE `%(table_name)s`;", kwargs)
-            kwargs.update(mode='insert')
-        if (mode == 'update') and self.driver and ('MYSQL' in self.driver.upper()):
-            self.writer = _UpdateDuplicateWriter(**kwargs)
-        elif mode in ('insert', 'replace'):
-            self.writer = _InsertReplaceWriter(**kwargs)
-        else:
-            raise RuntimeError("The driver '%s' can't handle this request" % self.driver)
-        return self.writer
-
-    def _create_table(self, table, table_name, **petl_kwargs):
-        if self.driver and ('MYSQL' in self.driver.upper()):
-            self.cursor().execute('SET SQL_MODE=ANSI_QUOTES')
-        petl.todb(table, self.connection, table_name, create=True, **petl_kwargs)
-
-
-class _Writer(object):
+class BridgeNode(object):
+    """Abstract class, it wraps an instance of ``lxml.etree.Element`` or ``xml.etree.ElementTree.Element`` as a implementor"""
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, connection, table_name, with_header, mode, slice_size, duplicate_key):
-        self.connection = connection
-        self.table_name = table_name
-        self.with_header = with_header
-        self.mode = mode
-        self.duplicate_key = duplicate_key
-        self.slice_size = slice_size
+    def __init__(self, element):
+        if element is None:
+            raise TypeError("Argument 'element' should be an instance of lxml.etree.Element or xml.etree.ElementTree.Element")
+        self.element = element
 
     @abc.abstractmethod
-    def make_sql(self):
-        """:return Iterator<SQL statement>"""
+    def to_dicts(self, **kwargs):
+        """expands the wrapped element tree into a ``sequence``.
+        :return: ``list<dict>``"""
+
+    def to_table(self, inclusive_tags=(), exclusive_tags=(), duplicate_tags=(), with_element=False, with_attrib=False, ):
+        dicts = self.to_dicts(duplicate_tags=duplicate_tags, with_element=with_element, with_attrib=with_attrib, )
+        table = dicts2table(dicts)  
+        if inclusive_tags:
+            header = [field for tag in inclusive_tags for field in table.header() if (tag == field) or field.startswith(tag + '_')]
+            table = table.cut(*header)
+        elif exclusive_tags:
+            header = [field for tag in exclusive_tags for field in table.header() if (tag == field) or field.startswith(tag + '_')]
+            table = table.cutout(*header)    
+        return table
+            
+    def findall(self, expression, **kwargs):
+        """Wraps the result of executing expression into a ``GroupNode`` and return it"""
+        return self._execute_expression(self.element, 'findall', expression, **kwargs)
+
+    def xpath(self, expression, **kwargs):
+        """Wraps the result of executing expression into a ``GroupNode`` and return it"""
+        return self._execute_expression(self.element, 'xpath', expression, **kwargs)
+
+    def _execute_expression(self, target_node, func_name, expression, **kwargs):
+        """executes expression over target_node methods named func_name"""
+        func = getattr(target_node, func_name)
+        elements = func(expression, **kwargs)
+        return GroupNode((XMLNode(e) for e in elements))
+
+    def join(self, other, key=None, **petl_kwargs):
+        """join this node and other node as a ``RelatedNode`` """
+        return self.relate(other, 'join', key=key, **petl_kwargs)
+
+    def crossjoin(self, other, **petl_kwargs):
+        """crossjoin this node and other node as a ``RelatedNode`` """
+        return self.relate(other, 'crossjoin', **petl_kwargs)
+
+    def relate(self, other, relation, **petl_kwargs):
+        """relate this node and other node as a ``RelatedNode`` over relation. relation is a function name of petl package"""
+        return RelatedNode(self, other, relation, **petl_kwargs)
+
+    def tag(self):
+        return get_tag(self.element)
+
+    def namespace(self):
+        return get_namespace(self.element)
         
-    @abc.abstractmethod
-    def write(self):
-        """load data to database"""
+    def nsmap(self, sub=None):
+        nsmap = self.element.nsmap
+        return dict((k if k else sub, v) for k, v in nsmap.items())
+
+    def __repr__(self):
+        return "<%s %s at 0x%x>" % (self.__class__.__name__, self.tag(), id(self))
 
 
-class _InsertReplaceWriter(_Writer):
-    def __init__(self, table, **kwargs):
-        super(_InsertReplaceWriter, self).__init__(**kwargs)
-        sequence = table.tuple() if isinstance(table, petl.util.base.Table) else table
-        if self.with_header:
-            self.header = sequence[0]
-            self.content = sequence[1:]
+class EmptyNode(BridgeNode):
+    """This class just use to relates another nodes"""
+
+    def __init__(self): pass
+
+    def to_dicts(self, **kwargs):
+        """implement"""
+        return []
+
+    def __repr__(self):
+        return "<%s %s at 0x%x>" % (self.__class__.__name__, 'None', id(self))
+
+
+class XMLNode(BridgeNode):
+    """This class wraps an instance of ``lxml.etree.Element`` or ``xml.etree.ElementTree.Element`` as a implementor"""
+
+    def to_dicts(self, **kwargs):
+        """implement"""
+        dicts = DFSExpansion(self.element, **kwargs).expand()
+        return dicts
+
+    def remove(self):
+        parent = self.element.getparent()
+        parent.remove(self.element)
+
+    def find(self, expression, **kwargs):
+        element = self.element.find(expression, **kwargs)
+        return XMLNode(element)
+
+
+class GroupNode(BridgeNode, list):
+    """This class wraps a not empty collection which type must be ``Iteration<? extends xmlutil.BridgeNode>``"""
+
+    def __init__(self, nodes):
+        self.extend(nodes)
+        BridgeNode.__init__(self, self[0].element)
+
+    def to_dicts(self, **kwargs):
+        """implement"""
+        dicts = []
+        for node in self:
+            dicts.extend(node.to_dicts(**kwargs))
+        return dicts
+
+    def _execute_expression(self, _, func_name, expression, **kwargs):
+        """overwrite"""
+        nodes = []
+        for node in self:
+            nodes.extend(BridgeNode._execute_expression(self, node, func_name, expression, **kwargs))
+        return GroupNode(nodes)
+
+    def remove(self):
+        for node in self:
+            node.remove()
+
+
+class RelatedNode(BridgeNode):
+    """This class wraps 2 node over their relation, which type must be ``extends xmlutil.BridgeNode``"""
+
+    def __init__(self, this, other, relation, **kwargs):
+        super(RelatedNode, self).__init__(other.element)
+        self.this = this
+        self.other = other
+        self.relation = relation
+        self.kwargs = kwargs
+
+    def to_dicts(self, **kwargs):
+        """implement"""
+        return self.to_table(**kwargs).dicts()
+
+    def to_table(self, **kwargs):
+        """overwrite"""            
+        this_table = dicts2table(self.this.to_dicts(**kwargs))
+        other_table = dicts2table(self.other.to_dicts(**kwargs))
+        if this_table.nrows() == 0:       # self.this is a EmptyNode
+            table = other_table
         else:
-            self.header = None
-            self.content = sequence
-        self.row_count = len(self.content)
-    
-    def write(self):
-        cursor = self.connection.cursor()
-        sql = self.make_sql().next()
-        affected_row_count = 0
-        for sub_table in self.slice_table():
-            num = cursor.executemany(sql, sub_table)
-            self.connection.commit()
-            affected_row_count += (num or 0)
-        return affected_row_count
+            table = getattr(this_table, self.relation)(other_table, **self.kwargs)
+        return table
 
-    def slice_table(self):
-        if self.row_count <= self.slice_size:
-            yield self.content
-            return
-        for loop_count in range(self.row_count / self.slice_size):
-            yield self.content[loop_count * self.slice_size: (loop_count + 1) * self.slice_size]
-        if self.row_count % self.slice_size > 0:
-            left = (loop_count + 1) * self.slice_size
-            yield self.content[left: left + self.row_count % self.slice_size]
-
-    def make_sql(self):
-        if self.header is not None:
-            fields = u', '.join(self.header)
-            values_fmt = u', '.join(('%s', ) * len(self.header))
-            sql = u"%s INTO %s (%s) VALUES (%s)" % (self.mode.upper(), self.table_name, fields, values_fmt)
-        else:
-            values_fmt = u', '.join(('%s', ) * len(self.content[0]))
-            sql = u"%s INTO %s VALUES (%s)" % (self.mode.upper(), self.table_name, values_fmt)
-        yield sql
+    def _execute_expression(self, _, func_name, expression, **kwargs):
+        """overwrite"""
+        nodes1 = BridgeNode._execute_expression(self, self.this, func_name, expression, **kwargs)
+        nodes2 = BridgeNode._execute_expression(self, self.other, func_name, expression, **kwargs)
+        return GroupNode(nodes1 + nodes2)
 
 
-class _UpdateDuplicateWriter(_Writer):
-    def __init__(self, table, **kwargs):
-        super(_UpdateDuplicateWriter, self).__init__(**kwargs)
-        if not self.duplicate_key or not self.with_header:
-            raise ValueError('Argument duplicate_key is not specified or argument table with not header')
-        self.content = table if isinstance(table, petl.util.base.Table) else petl.wrap(table)
+def dicts2table(dicts):
+    """transform dicts into a ``petl.util.base.Table``"""
+    return petl.wrap(petl.fromdicts(dicts)) if dicts else petl.empty()
 
-    def make_sql(self):
-        sql_statement_fmt = u"INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s"
-        for row in self.content.dicts():
-            dic = dict((k, v) for k, v in row.items() if v is not None)
-            keys = dic.keys()
-            keys_sql = ', '.join(keys)
-            values_sql = ', '.join(map(
-                lambda v: u"{}".format(v) if isinstance(v, numbers.Number) else u"'{}'".format(v), dic.values()))
-            update_keys = [k for k in keys if k not in self.duplicate_key]
-            update_items_sql = ', '.join(map(
-                lambda k: u"{}={}".format(k, dic[k]) if isinstance(dic[k], numbers.Number) else u"{}='{}'".format(k, dic[k]), update_keys))
-            yield sql_statement_fmt % (self.table_name, keys_sql, values_sql, update_items_sql)
 
-    def write(self):
-        cursor = self.connection.cursor()
-        affected_row_count = 0
-        for i, sql in enumerate(self.make_sql()):
-            num = cursor.execute(sql)
-            if (i > 0) and (i % self.slice_size == 0):
-                self.connection.commit()
-            affected_row_count += (num or 0)
-        self.connection.commit()
-        return affected_row_count
+class DFSExpansion(object):
+    """depth first search element tree and expands it into a ``sequence`` of ``dict``
+    :type element: ``lxml.etree.Element`` or ``xml.etree.cElementTree.Element``
+    :param duplicate_tags: elements with these tag will be renamed and added to a dictionary
+    :param with_element: the values of dictionaries contains of element if True otherwise contains of element's text.
+    :param with_attrib: element that's attribute is not empty will be added to dictionaries if with_attrib is True
+
+    E.g.,
+    >>> expansion = DFSExpansion(element)
+    >>> dicts = expansion.expand()
+    >>> for dic in dicts:
+    >>>     print dic
+    """
+
+    def __init__(self, element, duplicate_tags=(), with_element=False, with_attrib=False):
+        self.element = element
+        self.duplicate_tags = duplicate_tags
+        self.duplicate_tags_counter = None
+        self.with_element = with_element
+        self.with_attrib = with_attrib
+        self.dicts = list()
+        self.buffer_tags = list()
+        self.buffer_dict = OrderedDict()
+
+    def expand(self):
+        self._reset_duplicate_tags_counter()
+        self._expand(self.element)
+        return self.dicts
+
+    def _expand(self, element, level=0):
+        tag, text = get_tag(element), element.text.strip() if element.text else None
+        if text:                                     # element.text is not empty:
+            self._buffer(tag, text, element)
+        elif element.attrib and self.with_attrib:    # element.attribute is not empty and need to fetch it
+            self._buffer(tag, text, element, with_attrib=True)
+        for e in element:
+            self._expand(e, level + 1)
+        if level == 0:
+            self._insert(tag)
+
+    def _buffer(self, tag, text, element, with_attrib=False):
+        if self.buffer_dict.get(tag) is not None:
+            if self.duplicate_tags and tag in self.duplicate_tags:
+                self.duplicate_tags_counter[tag] += 1
+                tag = tag + '_' + str(self.duplicate_tags_counter[tag])
+            else:
+                self._insert(tag)
+        self.buffer_tags.append(tag)
+        buffering = element if self.with_element else (element.attrib if with_attrib else text)
+        self.buffer_dict.update({tag: buffering})
+
+    def _reset_duplicate_tags_counter(self):
+        self.duplicate_tags_counter = defaultdict(int)
+
+    def _insert(self, duplicate_tag):
+        self._reset_duplicate_tags_counter()
+        self.dicts.append(self.buffer_dict.copy())
+        try:
+            idx = self.buffer_tags.index(duplicate_tag)
+        except ValueError:
+            idx = len(self.buffer_tags)
+        for tag in self.buffer_tags[idx:]:
+            self.buffer_dict.has_key(tag) and self.buffer_dict.update({tag: None})
+        self.buffer_tags = self.buffer_tags[:idx]
+
