@@ -124,13 +124,13 @@ argument `driver` is a package name of underlying database driver that clients w
 >>> connector.connection                       # connection object
 >>> connector.cursor()                         # call cursor factory method to obtains a new cursor object
 >>> from pymysql.cursors import DictCursor
->>> connector.cursor(cursorclass=DictCursor)   # obtains a new customer cursor object
+>>> connector.cursor(cursor=DictCursor)   # obtains a new customer cursor object
 >>> connector.close()
 >>> # `db_config` is a `dict`
 >>> dbman.Connector(db_config={'host': 'localhost', 'user': 'bob', 'passwd': '****', 'port': 3306, 'db':'foo'}) 
 >>> # with statement Auto close connection/Auto commit. 
->>> with Connector() as cursor:                # with statement return cursor instead of connector
->>>	  cursor.execute('INSERT INTO point (y, x, z) VALUES (10, 1, 9);')  
+>>> with dbman.Connector() as cursor:                # with statement return cursor instead of connector
+>>>	  cursor.execute('INSERT INTO point (y, x, z) VALUES (1, 10, 9);')  
 ```
 
 ### ``Connector.connect``(driver=setting.driver, **kwargs):
