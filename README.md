@@ -19,19 +19,19 @@ Low Level Database I/O Adapter to A Pure Python Database Driver
 ...     yaml.dump(configuration, fp)
 ...
 >>> import dbman
->>> manipulator = dbman.Manipulator(file='dbconfig.yaml', ID='foo')
+>>> manipulator = dbman.Manipulator(db_config='dbconfig.yaml', db_label='foo')
 >>> table = [['x', 'y', 'z'], [1, 0, 0]]
->>> manipulator.todb(table, table_name='Point', mode='create')  # create a table named 'Point' in the schema 'foo'
->>> manipulator.fromdb('select * from Point;')
+>>> manipulator.todb(table, table_name='point', mode='create')  # create a table named 'point' in the schema 'foo'
+>>> manipulator.fromdb('select * from point;')
 +---+---+---+
 | x | y | z |
 +===+===+===+
 | 1 | 0 | 0 |
 +---+---+---+
 >>> # insert None header table
->>> manipulator.todb([[2,0,0], [3, 0, 0]], table_name='Point', mode='insert', with_header=False)  
+>>> manipulator.todb([[2,0,0], [3, 0, 0]], table_name='point', mode='insert', with_header=False)  
 2
->>> manipulator.fromdb('select * from Point;')
+>>> manipulator.fromdb('select * from point;')
 +---+---+---+
 | x | y | z |
 +===+===+===+
@@ -42,11 +42,12 @@ Low Level Database I/O Adapter to A Pure Python Database Driver
 | 3 | 0 | 0 |
 +---+---+---+
 
->>> manipulator.cursor().execute('ALTER TABLE `Point` ADD PRIMARY KEY(`x`);')  # set field 'x' as primary key
+>>> manipulator.cursor().execute('ALTER TABLE `point` ADD PRIMARY KEY(`x`);')  # set field 'x' as primary key
 0
->>> manipulator.todb([[2,5,0], [3, 5, 0]], table_name='Point', mode='replace', with_header=False) # replace 
+>>> # replace duplicate key 'x'
+>>> manipulator.todb([[2,5,0], [3, 5, 0]], table_name='point', mode='replace', with_header=False)
 4
->>> manipulator.fromdb('select * from Point;')
+>>> manipulator.fromdb('select * from point;')
 +---+---+---+
 | x | y | z |
 +===+===+===+
@@ -60,19 +61,19 @@ Low Level Database I/O Adapter to A Pure Python Database Driver
 >>> for sql in manipulator.writer.make_sql():   # check executed sql statement
 ...     print sql
 ...
-REPLACE INTO Point VALUES (%s, %s, %s)
+REPLACE INTO point VALUES (%s, %s, %s)
 >>> table = [['x', 'y', 'z'], [1, 9, 9], [2, 9, 9], [3, 9, 9]]
->>> # updatet if duplicated otherw insert
->>> manipulator.todb(table, table_name='Point', mode='update', duplicate_key=('x', )) 
+>>> # updatet if the key 'x' is duplicated otherw insert
+>>> manipulator.todb(table, table_name='point', mode='update', duplicate_key=('x', )) 
 6
 >>> for sql in manipulator.writer.make_sql():
 ...     print sql
 ...
-INSERT INTO Point (y, x, z) VALUES (9, 1, 9) ON DUPLICATE KEY UPDATE y=9, z=9
-INSERT INTO Point (y, x, z) VALUES (9, 2, 9) ON DUPLICATE KEY UPDATE y=9, z=9
-INSERT INTO Point (y, x, z) VALUES (9, 3, 9) ON DUPLICATE KEY UPDATE y=9, z=9
+INSERT INTO point (y, x, z) VALUES (9, 1, 9) ON DUPLICATE KEY UPDATE y=9, z=9
+INSERT INTO point (y, x, z) VALUES (9, 2, 9) ON DUPLICATE KEY UPDATE y=9, z=9
+INSERT INTO point (y, x, z) VALUES (9, 3, 9) ON DUPLICATE KEY UPDATE y=9, z=9
 >>> # prevent sql injection
->>> manipulator.fromdb('select * from Point;')
+>>> manipulator.fromdb('select * from point;')
 +---+---+---+
 | x | y | z |
 +===+===+===+
@@ -84,7 +85,7 @@ INSERT INTO Point (y, x, z) VALUES (9, 3, 9) ON DUPLICATE KEY UPDATE y=9, z=9
 +---+---+---+
 >>> # sliced big table to many sub-table with specified size, 1 subtable 1 transaction.
 >>> big_table = [[1, 88, 88], [2, 88, 88] ......]
->>> manipulator.todb(big_table, table_name='Point', with_header=False, slice_size=128)
+>>> manipulator.todb(big_table, table_name='point', with_header=False, slice_size=128)
 >>> manipulator.close()
 ```
 
@@ -92,31 +93,30 @@ INSERT INTO Point (y, x, z) VALUES (9, 3, 9) ON DUPLICATE KEY UPDATE y=9, z=9
 ### class ``dbman.setting``:
 Basic configuration for this module
 
-##### setting.file: a yaml filename or a dictionary object
-##### setting.ID: a string represents default database schema in yaml file
+##### setting.db_config: a yaml filename or a dictionary object
+##### setting.db_label: a string represents default database schema in yaml file
 ##### setting.driver: a package name of underlying database driver, 'pymysql' will be assumed by default.
 
-### ``dbman.base_setting``(file, ID=None, driver=None):
+### ``dbman.base_setting``(db_config, db_label=None, driver=None):
 Does basic configuration for this module.
 ```
 >>> import dbman
->>> dbman.base_setting(file='dbconfig.yaml', ID='foo') 
+>>> dbman.base_setting(db_config='dbconfig.yaml', db_label='foo') 
 ```
    
    
-### class ``dbman.Connector``([file, [ID, [driver]]] ):
+### class ``dbman.Connector``([db_config, [db_label, [driver]]] ):
 This class obtains and maintains a connection to a schema.<br>
-argument `file` should be a yaml filename or a dictionary object, `setting.file` will be used if it's omitted.
-if the argument file is a yaml filename, loading the content as configuration.
-the dictionary or yaml content, which will either passed directly to the underlying DBAPI
-``connect()`` method as additional keyword arguments.
-argument `ID` is a string represents a schema, `setting.ID` will be used if it's omitted.
+argument `db_config` should be a yaml filename or a dictionary object, `setting.db_config` will be used if it's omitted.
+if the argument `db_config` is a yaml filename, loading the content as configuration.
+the dictionary or yaml content, which will either to the underlying DBAPI ``connect()`` method as additional keyword arguments.
+argument `db_label` is a string represents a schema, `setting.db_label` will be used if it's omitted.
 argument `driver` is a package name of underlying database driver that clients want to use, `pymysql` will be assumed if it's omitted.
 :type driver: str` = {'pymysql' | 'MySQLdb' | 'pymssql'}
 	
 ```
 >>> import dbman
->>> dbman.base_setting(file='dbconfig.yaml', ID='foo', driver='pymysql')
+>>> dbman.base_setting(db_config='dbconfig.yaml', db_label='foo', driver='pymysql')
 >>> connector = dbman.Connector()              # instantialize Connector with basic configuration
 >>> connector.driver                           # using underlying driver name
 >>> connector._connection                      # associated connection object
@@ -126,12 +126,11 @@ argument `driver` is a package name of underlying database driver that clients w
 >>> from pymysql.cursors import DictCursor
 >>> connector.cursor(cursorclass=DictCursor)   # obtains a new customer cursor object
 >>> connector.close()
->>> # file is a dict
->>> dbman.Connector(file={'host': 'localhost', 'user': 'bob', 'passwd': '****', 'port': 3306, 'db':'foo'}) 
+>>> # `db_config` is a `dict`
+>>> dbman.Connector(db_config={'host': 'localhost', 'user': 'bob', 'passwd': '****', 'port': 3306, 'db':'foo'}) 
 >>> # with statement Auto close connection/Auto commit. 
 >>> with Connector() as cursor:                # with statement return cursor instead of connector
->>>	  cursor.execute('select now();')
->>>	  cursor.fetchall()
+>>>	  cursor.execute('INSERT INTO point (y, x, z) VALUES (10, 1, 9);')  
 ```
 
 ### ``Connector.connect``(driver=setting.driver, **kwargs):
