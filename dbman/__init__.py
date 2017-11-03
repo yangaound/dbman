@@ -16,14 +16,14 @@ import petl
 
 
 class setting:
-    ID = None
-    file = None
+    db_label = None
+    db_config = None
     driver = 'pymysql'
 
 
-def base_setting(file, ID=None, driver=None, ):
+def base_setting(db_config, db_label=None, driver=None, ):
     """
-    Does basic configuration for this module object.
+    Does basic configuration for this module.
 
     E.g.,
     >>> configuration = {
@@ -41,45 +41,46 @@ def base_setting(file, ID=None, driver=None, ):
     ...     yaml.dump(configuration, fp)
     ...
     >>> import dbman
-    >>> dbman.base_setting(file='dbconfig.yaml', )
+    >>> dbman.base_setting(db_config='dbconfig.yaml', db_label='foo')
     """
-    setting.file = file
-    setting.ID = ID
+    setting.db_config = db_config
+    setting.db_label = db_label
     setting.driver = driver or setting.driver
 
 
 class Connector(object):
     """ This class obtains and maintains a connection to a schema"""
 
-    def __init__(self, file=None, ID=None, driver=None, ):
+    def __init__(self, db_config=None, db_label=None, driver=None, ):
         """   
-        :param file:
-            a yaml filename or a dictionary object, `setting.file` will be used if it's omitted.
-            if the argument file is a yaml filename, loading the content as configuration.
-            the dictionary or yaml content, which will either passed directly to the underlying DBAPI
+        :param db_config:
+            a yaml filename or a dictionary object, `setting.db_config` will be used if it's omitted.
+            if the argument `db_config` is a yaml filename, loading the content as configuration.
+            the dictionary or yaml content, which will either passed to the underlying DBAPI
             ``connect()`` method as additional keyword arguments.
-        :type file: `dict` or `basestring`
-        :param ID: a string represents a schema, `setting.ID` will be used if it's omitted.
+        :type db_config: `dict` or `basestring`
+        :param db_label: a string represents a schema, `setting.db_label` will be used if it's omitted.
         :param driver: package name of underlying database driver that clients want to use, `pymysql` will be assumed if it's omitted.
         :type driver: str` = {'pymysql' | 'MySQLdb' | 'pymssql'}
         """
-        file = file or setting.file
-        ID = ID or setting.ID
-        if isinstance(file, basestring):
-            with open(file) as f:
+        db_config = db_config or setting.db_config
+        db_label = db_label or setting.db_label
+        if isinstance(db_config, basestring):
+            with open(db_config) as f:
                 yaml_obj = yaml.load(f)
-            self.driver = yaml_obj[ID].get('driver') or driver or setting.driver  # driver name
-            self.connect_args = yaml_obj[ID]['config']
-        elif isinstance(file, dict):
+            self.driver = yaml_obj[db_label].get('driver') or driver or setting.driver  # driver name
+            self.connect_args = yaml_obj[db_label]['config']
+        elif isinstance(db_config, dict):
             self.driver = driver or setting.driver
-            self.connect_args = file
+            self.connect_args = db_config
         else:
-            raise TypeError("Unexpected data type in argument 'file'")
+            raise TypeError("Unexpected data type in argument 'db_config'")
         self.writer = None                                                 # dependency delegator for writing database
         self._connection = self.connect(self.driver, **self.connect_args)  # associated connection
         self._cursor = self._connection.cursor()                           # associated cursor
 
     def __enter__(self):
+        """with statement return cursor instead of connector"""
         return self._cursor
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -139,7 +140,7 @@ class Manipulator(Connector):
     def todb(self, table, table_name, mode='insert', with_header=True, slice_size=128, duplicate_key=()):
         """
         :param table: data container, a `petl.util.base.Table` or a sequence like: [header, row1, row2, ...] or [row1, row2, ...]
-        :param table_name: the name of a table in this ID.
+        :param table_name: the name of a table in this database
         :param mode:
             execute SQL INSERT INTO Statement if `mode` equal to 'insert'.
             execute SQL REPLACE INTO Statement if `mode` equal to 'replace'.
