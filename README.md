@@ -73,15 +73,11 @@ INSERT INTO point (y, x, z) VALUES (9, 1, 9) ON DUPLICATE KEY UPDATE y=9, z=9
 INSERT INTO point (y, x, z) VALUES (9, 2, 9) ON DUPLICATE KEY UPDATE y=9, z=9
 INSERT INTO point (y, x, z) VALUES (9, 3, 9) ON DUPLICATE KEY UPDATE y=9, z=9
 >>> # prevent sql injection
->>> manipulator.fromdb('select * from point;')
+>>> manipulator.fromdb('select * from point where x=%(input)s;', {'input': 1})
 +---+---+---+
 | x | y | z |
 +===+===+===+
 | 1 | 9 | 9 |
-+---+---+---+
-| 2 | 9 | 9 |
-+---+---+---+
-| 3 | 9 | 9 |
 +---+---+---+
 >>> # sliced big table to many sub-table with specified size, 1 subtable 1 transaction.
 >>> big_table = [[1, 88, 88], [2, 88, 88] ......]
