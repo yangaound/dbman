@@ -18,21 +18,21 @@ import petl
 class setting:
     db_label = None
     db_config = None
-    driver = 'pymysql'
+    driver = 'MySQLdb'
 
 
-def base_setting(db_config, db_label=None, driver=None, ):
+def base_setting(db_config, db_label, driver=None, ):
     """
     Does basic configuration for this module.
 
     E.g.,
     >>> configuration = {
     ... 'foo': {
-    ...     'driver': 'pymysql',
+    ...     'driver': 'MySQLdb',
     ...     'config': {'host': 'localhost', 'user': 'bob', 'passwd': '****', 'port': 3306, 'db':'foo'},
     ...     },
     ... 'bar': {
-    ...     'driver': 'MySQLdb',
+    ...     'driver': 'pymysql',
     ...     'config': {'host': 'localhost', 'user': 'bob', 'passwd': '****', 'port': 3306, 'db':'bar'},
     ...     },
     ... }
@@ -54,13 +54,13 @@ class Connector(object):
     def __init__(self, db_config=None, db_label=None, driver=None, ):
         """   
         :param db_config:
-            a yaml filename or a dictionary object, `setting.db_config` will be used if it's omitted.
-            if the argument `db_config` is a yaml filename, loading the content as configuration.
-            the dictionary or yaml content, which will either passed to the underlying DBAPI
-            ``connect()`` method as additional keyword arguments.
+            a yaml filename or a dictionary object. if the argument `db_config` is a yaml filename,
+            it will be loaded as configuration.`setting.db_config` will be used if it's omitted.
+            dictionary or yaml content, which will either passed to the underlying DBAPI ``connect()`` 
+            method as additional keyword arguments.
         :type db_config: `dict` or `basestring`
         :param db_label: a string represents a schema, `setting.db_label` will be used if it's omitted.
-        :param driver: package name of underlying database driver that clients want to use, `pymysql` will be assumed if it's omitted.
+        :param driver: package name of underlying database driver that clients want to use, `MySQLdb` will be assumed if it's omitted.
         :type driver: str` = {'pymysql' | 'MySQLdb' | 'pymssql'}
         """
         db_config = db_config or setting.db_config
@@ -116,8 +116,8 @@ class Manipulator(Connector):
     def __init__(self, connection=None, driver=None, **kwargs):
         """    
         :param connection: a connection object.
-        :param driver: package name of underlying database driver that users want to use, `pymysql` will be assumed if it's omitted.
-        :param kwargs: if `connection` is `None`, `kwargs` will be passed to `dbman.Connector`` to obtains a connection, 
+        :param driver: package name of underlying database driver that users want to use, `MySQLdb` will be assumed if it's omitted.
+        :param kwargs: if `connection` is `None`, `kwargs` will be passed to supper class to obtain a connection, 
             otherwise it will be ignored.
         """
         if connection is None:
