@@ -89,25 +89,22 @@ INSERT INTO point (y, x, z) VALUES (9, 3, 9) ON DUPLICATE KEY UPDATE y=9, z=9
 ### class ``dbman.setting``:
 Basic configuration for this module
 
-##### setting.db_config: a yaml filename or a dictionary object
-##### setting.db_label: a string represents default database schema in yaml file
-##### setting.driver: a package name of underlying database driver, 'pymysql' will be assumed by default.
+##### `.db_config`: a yaml filename or a dictionary object
+##### `.db_label`: a string represents default database schema
+##### `.driver`: a package name of underlying database driver, 'pymysql' will be assumed by default.
 
-### ``dbman.base_setting``(db_config, db_label=None, driver=None):
+### ``dbman.base_setting``(db_config, db_label, driver=None):
 Does basic configuration for this module.
 ```
 >>> import dbman
->>> dbman.base_setting(db_config='dbconfig.yaml', db_label='foo') 
+>>> dbman.base_setting(db_config='dbconfig.yaml', db_label='foo', driver='pymysql') 
 ```
    
    
 ### class ``dbman.Connector``([db_config, [db_label, [driver]]] ):
 This class obtains and maintains a connection to a schema.<br>
 argument `db_config` should be a yaml filename or a dictionary object, `setting.db_config` will be used if it's omitted.
-if the argument `db_config` is a yaml filename, loading the content as configuration.
-the dictionary or yaml content, which will either to the underlying DBAPI ``connect()`` method as additional keyword arguments.
-argument `db_label` is a string represents a schema, `setting.db_label` will be used if it's omitted.
-argument `driver` is a package name of underlying database driver that clients want to use, `pymysql` will be assumed if it's omitted.
+if the argument `db_config` is a yaml filename, load its content; the content or dictionary, which will either passed to the underlying DBAPI ``connect()`` method as additional keyword arguments. argument `db_label` is a string represents a schema, `setting.db_label` will be used if it's omitted. argument `driver` is a package name of underlying database driver that clients want to use, `setting.driver` will be assumed if it's omitted.
 :type driver: str` = {'pymysql' | 'MySQLdb' | 'pymssql'}
 	
 ```
@@ -120,17 +117,17 @@ argument `driver` is a package name of underlying database driver that clients w
 >>> connector.connection                       # connection object
 >>> connector.cursor()                         # call cursor factory method to obtains a new cursor object
 >>> from pymysql.cursors import DictCursor
->>> connector.cursor(cursor=DictCursor)   # obtains a new customer cursor object
->>> connector.close()
+>>> connector.cursor(cursor=DictCursor)        # obtains a new customer cursor object
+>>> connector.close()                          # close the associated cursor and connection
 >>> # `db_config` is a `dict`
 >>> dbman.Connector(db_config={'host': 'localhost', 'user': 'bob', 'passwd': '****', 'port': 3306, 'db':'foo'}) 
 >>> # with statement Auto close connection/Auto commit. 
->>> with dbman.Connector() as cursor:                # with statement return cursor instead of connector
+>>> with dbman.Connector() as cursor:          # with statement return cursor instead of connector
 >>>	  cursor.execute('INSERT INTO point (y, x, z) VALUES (1, 10, 9);')  
 ```
 
 ### ``Connector.connect``(driver=setting.driver, **kwargs):
-obtains a connection.
+obtains a new connection.
 ```
 >>> from dbman import Connector
 >>> Connector.connect(host='localhost', user='root', passwd='', port=3306, db='foo') 
@@ -139,8 +136,7 @@ obtains a connection.
 ### class ``dbman.Manipulator``(connection=None, driver=None, **kwargs):
 This class inherits `dbman.Connector` and add 2 methods: `fromdb()` for read and `todb()` for write.<br />
 argument `connection` should be a connection object. 
-argument `driver` is a package name of underlying database driver that clients want to use, `pymysql` will be assumed if it's omitted.
-if `connection` is `None`, `kwargs` will be passed to `dbman.Connector` to obtains a connection, otherwise `kwargs` will be ignored.
+argument `driver` is a package name of underlying database driver that clients want to use, `setting.driver` will be assumed if it's omitted. argument `kwargs` will be passed to super class to obtains a connection if it's `None`, otherwise it will be ignored.
 
 
 ### Manipulator.`fromdb`(select_stmt, args=None, latency=False)
@@ -148,16 +144,16 @@ Argument `select_stmt` and `args` will be passed to the underlying API `cursor.e
 fetch and wraps all data immediately if the optional keyword argument `latency` is `True`
 
 
-### Manipulator.`todb`(table, table_name, mode='insert', with_header=True, slice_size=128, duplicate_key=())
-:param table: data container, a `petl.util.base.Table` or a sequence like: [header, row1, row2, ...] or [row1, row2, ...].<br />
-:param table_name: the name of a table in this schema.<br />
-:param mode:<br />
+### Manipulator.`todb`(table, table_name, mode='insert', with_header=True, slice_size=128, duplicate_key=()ber<br/>
+this method return a number represent affectted row number<br/>
+the argumen `table` is a data container, a `petl.util.base.Table` or a sequence like: [header, row1, row2, ...] or [row1, row2, ...].<br />
+the argument `table_name` is the name of a table in this schema.<br />
+the argument `mode`:<br />
 	execute SQL INSERT INTO Statement if `mode` equal to 'insert'.<br />
 	execute SQL REPLACE INTO Statement if `mode` equal to 'replace'.<br />
 	execute SQL INSERT ... ON DUPLICATE KEY UPDATE Statement if `mode` equal to 'update'(only mysql).<br />
  	execute SQL TRUNCATE TABLE Statement and then execute SQL INSERT INTO Statement if `mode` equal to 'truncate'.<br />
 	create a table and insert data into it if `mode` equal to 'create'.
-:param duplicate_key: it must be present if the argument `mode` is 'update', otherwise it will be ignored.<br />
-:param with_header: specify `True` if the argument `table` with header, otherwise specify `False`.<br />
-:param slice_size: the `table` will be sliced to many subtable with `slice_size`, 1 transaction for 1 subtable.<br />
-:return: affectted row number
+the argument `duplicate_key` must be present if the argument `mode` is 'update', otherwise it will be ignored.<br />
+the argument `with_header` should be `True` if the argument `table` with header, otherwise `False`.<br />
+the argument `slice_size` used to the slice `table` into many subtable with `slice_size`, 1 transaction for 1 subtable.<br />
