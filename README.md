@@ -145,7 +145,7 @@ fetch and wraps all data immediately if the optional keyword argument `latency` 
 
 
 ### Manipulator.`todb`(table, table_name, mode='insert', with_header=True, slice_size=128, duplicate_key=()ber<br/>
-this method return a number that represents affectted row number<br/>
+this method return a number that describes affected row number<br/>
 the argumen `table` is a data container, a `petl.util.base.Table` or a sequence like: [header, row1, row2, ...] or [row1, row2, ...].<br />
 the argument `table_name` is the name of a table in this schema.<br />
 the argument `mode`:<br />
