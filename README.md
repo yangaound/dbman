@@ -113,8 +113,8 @@ if the argument `db_config` is a yaml filename, load its content; the content or
 >>> connector._driver                          # using underlying driver name
 >>> connector._connection                      # associated connection object
 >>> connector._cursor                          # associated cursor object
->>> connector.connection                       # connection object
->>> connector.cursor()                         # call cursor factory method to obtains a new cursor object
+>>> connector.connection                       # a property that maintaines the associated connection object
+>>> connector.cursor()                         # factory method that creates a new cursor object
 >>> from pymysql.cursors import DictCursor
 >>> connector.cursor(cursor=DictCursor)        # obtains a new customer cursor object
 >>> connector.close()                          # close the associated cursor and connection
