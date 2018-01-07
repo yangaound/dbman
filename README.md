@@ -126,8 +126,8 @@ if the argument `db_config` is a yaml filename, load its content; the content or
 >>>	  cursor.execute('INSERT INTO point (y, x, z) VALUES (1, 10, 9);')  
 ```
 
-### ``Connector.connect``(driver=setting.driver, **kwargs):
-obtains a new connection.
+### ``Connector.connect``(driver=None, **kwargs):
+obtains a new connection. `setting.driver` will be used if the argument `driver` is omitted.
 ```
 >>> from dbman import Connector
 >>> Connector.connect(host='localhost', user='root', passwd='', port=3306, db='foo') 
