@@ -104,8 +104,7 @@ Does basic configuration for this module.
 ### class ``dbman.Connector``([db_config, [db_label, [driver]]] ):
 This class obtains and maintains a connection to a schema.<br>
 argument `db_config` should be a yaml filename or a dictionary object, `setting.db_config` will be used if it's omitted.
-if the argument `db_config` is a yaml filename, load its content; the content or dictionary, which will either passed to the underlying DBAPI ``connect()`` method as additional keyword arguments. argument `db_label` is a string represents a schema, `setting.db_label` will be used if it's omitted. argument `driver` is a package name of underlying database driver that clients want to use, `setting.driver` will be assumed if it's omitted.
-:type driver: str` = {'pymysql' | 'MySQLdb' | 'pymssql'}
+if the argument `db_config` is a yaml filename, load its content; the content or dictionary, which will either passed to the underlying DBAPI ``connect()`` method as additional keyword arguments. argument `db_label` is a string represents a schema, `setting.db_label` will be used if it's omitted. argument `driver` is a package name of underlying database driver that clients want to use, `setting.driver` will be assumed if it's omitted. the driver values can be 'pymysql' or 'MySQLdb' or 'pymssql'.
 	
 ```
 >>> import dbman
