@@ -138,12 +138,12 @@ argument `connection` should be a connection object.
 argument `driver` is a package name of underlying database driver that clients want to use, `setting.driver` will be assumed if it's omitted. argument `kwargs` will be passed to super class to obtains a connection if it's `None`, otherwise it will be ignored.
 
 
-### Manipulator.`fromdb`(select_stmt, args=None, latency=False)
+### `Manipulator.fromdb`(select_stmt, args=None, latency=False)
 Argument `select_stmt` and `args` will be passed to the underlying API `cursor.execute()`.
 fetch and wraps all data immediately if the optional keyword argument `latency` is `True`
 
 
-### Manipulator.`todb`(table, table_name, mode='insert', with_header=True, slice_size=128, duplicate_key=()ber<br/>
+### `Manipulator.todb`(table, table_name, mode='insert', with_header=True, slice_size=128, duplicate_key=()ber<br/>
 this method return a number that describes affected row number<br/>
 the argumen `table` is a data container, a `petl.util.base.Table` or a sequence like: [header, row1, row2, ...] or [row1, row2, ...].<br />
 the argument `table_name` is the name of a table in this schema.<br />
