@@ -145,7 +145,7 @@ fetch and wraps all data immediately if the optional keyword argument `latency` 
 
 
 ### Manipulator.`todb`(table, table_name, mode='insert', with_header=True, slice_size=128, duplicate_key=()ber<br/>
-this method return a number represent affectted row number<br/>
+this method return a number that represents affectted row number<br/>
 the argumen `table` is a data container, a `petl.util.base.Table` or a sequence like: [header, row1, row2, ...] or [row1, row2, ...].<br />
 the argument `table_name` is the name of a table in this schema.<br />
 the argument `mode`:<br />
@@ -156,4 +156,4 @@ the argument `mode`:<br />
 	create a table and insert data into it if `mode` equal to 'create'.
 the argument `duplicate_key` must be present if the argument `mode` is 'update', otherwise it will be ignored.<br />
 the argument `with_header` should be `True` if the argument `table` with header, otherwise `False`.<br />
-the argument `slice_size` used to the slice `table` into many subtable with `slice_size`, 1 transaction for 1 subtable.<br />
+the argument `slice_size` used to slice `table` into many subtable with `slice_size`, 1 transaction for 1 subtable.<br />
