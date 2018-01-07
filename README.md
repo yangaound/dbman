@@ -110,7 +110,7 @@ if the argument `db_config` is a yaml filename, load its content; the content or
 >>> import dbman
 >>> dbman.base_setting(db_config='dbconfig.yaml', db_label='foo')
 >>> connector = dbman.Connector()              # instantialize Connector with basic configuration
->>> connector.driver                           # using underlying driver name
+>>> connector._driver                          # using underlying driver name
 >>> connector._connection                      # associated connection object
 >>> connector._cursor                          # associated cursor object
 >>> connector.connection                       # connection object
