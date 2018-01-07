@@ -97,7 +97,7 @@ Basic configuration for this module
 Does basic configuration for this module.
 ```
 >>> import dbman
->>> dbman.base_setting(db_config='dbconfig.yaml', db_label='foo', driver='pymysql') 
+>>> dbman.base_setting(db_config='dbconfig.yaml', db_label='foo') 
 ```
    
    
