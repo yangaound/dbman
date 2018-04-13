@@ -8,6 +8,8 @@ Created on 2016年12月24日
 @author: albin
 """
 
+__version__ = '1.0.1'
+
 import numbers
 import abc
 
@@ -22,11 +24,9 @@ class setting:
 
 
 def base_setting(db_config, db_label, driver=None, ):
-    """
-    Does basic configuration for this module.
-
+    """Does basic configuration for this module.
     E.g.,
-    >>> configuration = {
+    >>> from nagr import dbman    >>> configuration = {
     ... 'foo': {
     ...     'driver': 'MySQLdb',
     ...     'config': {'host': 'localhost', 'user': 'bob', 'passwd': '****', 'port': 3306, 'db':'foo'},
@@ -40,7 +40,6 @@ def base_setting(db_config, db_label, driver=None, ):
     >>> with open('dbconfig.yaml', 'w') as fp:
     ...     yaml.dump(configuration, fp)
     ...
-    >>> import dbman
     >>> dbman.base_setting(db_config='dbconfig.yaml', db_label='foo')
     """
     setting.db_config = db_config
@@ -52,11 +51,11 @@ class Connector(object):
     """ This class obtains and maintains a connection to a schema"""
 
     def __init__(self, db_config=None, db_label=None, driver=None, ):
-        """   
+        """
         :param db_config:
             a yaml filename or a dictionary object. if the argument `db_config` is a yaml filename,
             it will be loaded as configuration.`setting.db_config` will be used if it's omitted.
-            dictionary or yaml content, which will either passed to the underlying DBAPI ``connect()`` 
+            dictionary or yaml content, which will either passed to the underlying DBAPI ``connect()``
             method as additional keyword arguments.
         :type db_config: `dict` or `basestring`
         :param db_label: a string represents a schema, `setting.db_label` will be used if it's omitted.
@@ -130,9 +129,9 @@ class Manipulator(Connector):
         """overwrite"""
         return self
 
-    def fromdb(self, select_stmt, args=None, latency=False):
+    def fromdb(self, select_stmt, args=None, latency=True):
         """argument `select_stmt` and `args` will be passed to the underlying API `cursor.execute()`.
-        fetch and wraps all data immediately if the optional keyword argument `latency` is `True`
+        fetch and wraps all data immediately if the optional keyword argument `latency` is `False`
         """
         temp = petl.fromdb(self.connection, select_stmt, args)
         return temp if latency else petl.wrap([row for row in temp])
@@ -241,6 +240,11 @@ class _InsertReplaceWriter(_Writer):
         yield sql
 
 
+def obj2sql(obj):
+
+    lambda v: str(v) if isinstance(v, numbers.Number) else u"'%s'" % v
+
+
 class _UpdateDuplicateWriter(_Writer):
     def __init__(self, table, **kwargs):
         super(_UpdateDuplicateWriter, self).__init__(**kwargs)
@@ -248,17 +252,25 @@ class _UpdateDuplicateWriter(_Writer):
             raise ValueError('Argument duplicate_key is not specified or argument table with not header')
         self.content = table if isinstance(table, petl.util.base.Table) else petl.wrap(table)
 
+    @staticmethod
+    def obj2sql(obj):
+        if isinstance(obj, numbers.Number):
+            sql = str(obj)
+        elif isinstance(obj, basestring):
+            sql = u"'%s'" % obj.replace("'", "''")
+        else:
+            sql = u"'%s'" % obj
+        return sql
+
     def make_sql(self):
         sql_statement_fmt = u"INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s"
         for row in self.content.dicts():
             dic = dict((k, v) for k, v in row.items() if v is not None)
             keys = dic.keys()
             keys_sql = ', '.join(keys)
-            values_sql = ', '.join(map(
-                lambda v: u"{}".format(v) if isinstance(v, numbers.Number) else u"'{}'".format(v), dic.values()))
-            update_keys = [k for k in keys if k not in self.duplicate_key]
-            update_items_sql = ', '.join(map(
-                lambda k: u"{}={}".format(k, dic[k]) if isinstance(dic[k], numbers.Number) else u"{}='{}'".format(k, dic[k]), update_keys))
+            values_sql = ', '.join(map(self.obj2sql, dic.values()))
+            update_items = map(lambda field: u"%s=%s" % (field, self.obj2sql(dic[field])), (k for k in keys if k not in self.duplicate_key))
+            update_items_sql = ', '.join(update_items)
             yield sql_statement_fmt % (self.table_name, keys_sql, values_sql, update_items_sql)
 
     def write(self):
