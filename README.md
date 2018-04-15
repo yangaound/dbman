@@ -158,7 +158,8 @@ argument `driver` is a package name of underlying database drivers that clients 
 >>> connect(driver='pymssql', host='localhost', user='root', password='', port=1433, database='baz') 
 ```
 
-### class ``dbman.RWProxy``([db_config, [db_label, [driver, [connection]]]]):
+### class ``dbman.RWProxy``([db_config, [db_label, [driver, [
+]]]]):
 This class inherits `dbman.ConnectionProxy` and add 2 methods: `fromdb()` for read and `todb()` for write.
 if the argument connection is no None, this proxy will bind with, otherwise `db_config`, `db_label` and `driver` 
 will be passed to supper to obtain a connection.
