@@ -116,7 +116,7 @@ Basic configuration for this module
 >>> proxy = RWProxy()
 >>> proxy.close()
 >>> # with statement Auto close connection/Auto commit.
->>> with RWProxy() as cursor:  # with statement return cursor instead of ConnectionProxy
+>>> with ConnectionProxy() as cursor:  # with statement return cursor instead of ConnectionProxy
 ...     cursor.execute('INSERT INTO point (y, x, z) VALUES (10, 10, 10);')
 ...
 >>>

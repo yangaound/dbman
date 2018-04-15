@@ -52,15 +52,14 @@ class BasicConfig:
         ...     yaml.dump(configuration, fp)
         ...
         >>>
-        >>> from dbman import BasicConfig, RWProxy
+        >>> from dbman import BasicConfig, ConnectionProxy, RWProxy
         >>> # does basic configuration
         >>> BasicConfig.set(db_config='dbconfig.yaml', db_label='foo_label')
-        >>> # New a `RWProxy` with configuration file
-        >>> proxy = RWProxy(db_config='dbconfig.yaml', db_label='foo_label')
+        >>> proxy = RWProxy()
         >>> proxy.close()
-        >>> # New a `RWProxy` using basic configuration
-        >>> with RWProxy() as proxy:
-        ...     pass
+        >>> # with statement Auto close connection/Auto commit.
+        >>> with ConnectionProxy() as cursor:  # with statement return cursor instead of ConnectionProxy
+        ...     cursor.execute('INSERT INTO point (y, x, z) VALUES (10, 10, 10);')
         ...
         >>>
         """
