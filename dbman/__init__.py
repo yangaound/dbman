@@ -23,8 +23,8 @@ class BasicConfig:
     db_config = None
     # a string represents default database schema
     db_label = None
-    # a package name of underlying database driver, 'MySQLdb' will be assumed by default.
-    driver = 'MySQLdb'
+    # a package name of underlying database driver, 'pymysql' will be assumed by default.
+    driver = 'pymysql'
 
     @staticmethod
     def set(db_config, db_label, driver=None, ):
@@ -35,11 +35,11 @@ class BasicConfig:
         >>> # make a configuration file with yaml format
         >>> configuration = {
         ...  'foo_label': {
-        ...     'driver': 'MySQLdb',
+        ...     'driver': 'pymysql',
         ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'passwd': '', 'port': 3306, 'db': 'foo'},
         ...     },
         ...  'bar_label': {
-        ...     'driver': 'pymysql',
+        ...     'driver': 'MySQLdb',
         ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'passwd': '', 'port': 3306, 'db': 'bar'},
         ...     },
         ...  'baz_label': {

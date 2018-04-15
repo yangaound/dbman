@@ -6,11 +6,11 @@ Low Level Database I/O Adapter to A Pure Python Database Driver
 >>> # make a configuration file with yaml format
 >>> configuration = {
 ...  'foo_label': {
-...     'driver': 'MySQLdb',
+...     'driver': 'pymysql',
 ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'passwd': '', 'port': 3306, 'db': 'foo'},
 ...     },
 ...  'bar_label': {
-...     'driver': 'pymysql',
+...     'driver': 'MySQLdb',
 ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'passwd': '', 'port': 3306, 'db': 'bar'},
 ...     },
 ...  'baz_label': {
@@ -107,7 +107,7 @@ Basic configuration for this module
 
 ##### `.db_config`: a yaml file path
 ##### `.db_label`: a string represents default database schema
-##### `.driver`: a package name of underlying database driver, 'MySQLdb' will be assumed by default.
+##### `.driver`: a package name of underlying database driver, 'pymysql' will be assumed by default.
 ##### ``.set``(db_config, db_label, [driver]): does basic configuration for this module.
 
 ```
