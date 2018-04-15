@@ -141,10 +141,10 @@ argument `driver` is a package name of underlying database drivers that clients 
 >>> proxy1.cursor()                               # factory method that creates a cursor object
 >>> # instantialize `ConnectionProxy` with basic configuration to schema 'bar'
 >>> proxy2 = ConnectionProxy(db_label='bar_label')
->>> from MySQLdb.cursors import DictCursor as C1
->>> from pymysql.cursors import DictCursor as C2
->>> proxy1.cursor(cursorclass=C1)                 # obtains a new customer cursor object depends on dirver 'MySQLdb'
->>> proxy2.cursor(cursorclass=C2)                 # obtains a new customer cursor object depends on dirver 'pymysql'
+>>> from pymysql.cursors import DictCursor as C1
+>>> from MySQLdb.cursors import DictCursor as C2
+>>> proxy1.cursor(cursorclass=C1)                 # obtains a new customer cursor object depends on dirver 'pymysql'
+>>> proxy2.cursor(cursorclass=C2)                 # obtains a new customer cursor object depends on dirver 'MySQLdb'
 >>> proxy1.close()
 >>> proxy2.close()
 ```
