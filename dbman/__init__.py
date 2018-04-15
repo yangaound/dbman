@@ -140,7 +140,7 @@ class ConnectionProxy(object):
 
     def __enter__(self):
         """with statement return a cursor instead of a ``dbman.ConnectionProxy``"""
-        return self._cursor
+        return self.cursor()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """commit if successful otherwise rollback"""
