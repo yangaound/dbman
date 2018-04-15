@@ -103,7 +103,7 @@ INSERT INTO point (y, x, z) VALUES (9, 3, 9) ON DUPLICATE KEY UPDATE y=9, z=9
 ### class ``dbman.BasicConfig``:
 Basic configuration for this module
 
-##### `.db_config`: a yaml filename or a dictionary object
+##### `.db_config`: a yaml file path
 ##### `.db_label`: a string represents default database schema
 ##### `.driver`: a package name of underlying database driver, 'MySQLdb' will be assumed by default.
 ##### ``.set``(db_config, db_label, [driver]): does basic configuration for this module.
