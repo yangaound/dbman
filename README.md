@@ -5,16 +5,15 @@ Low Level Database I/O Adapter to A Pure Python Database Driver
 ```
 >>> # make a configuration file with yaml format
 >>> configuration = {
-... 'foo_label': {
+...  'foo_label': {
 ...     'driver': 'MySQLdb',
 ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'passwd': '', 'port': 3306, 'db': 'foo'},
 ...     },
-...
-... 'bar_label': {
+...  'bar_label': {
 ...     'driver': 'pymysql',
 ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'passwd': '', 'port': 3306, 'db': 'bar'},
 ...     },
-... 'baz_label': {
+...  'baz_label': {
 ...     'driver': 'pymssql',
 ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'password': '', 'port': 1433, 'database': 'baz'},
 ...     },
@@ -23,17 +22,8 @@ Low Level Database I/O Adapter to A Pure Python Database Driver
 >>> with open('dbconfig.yaml', 'w') as fp:
 ...     yaml.dump(configuration, fp)
 ...
->>> from dbman import BasicConfig, RWProxy
->>> # does basic configuration
->>> BasicConfig.set(db_config='dbconfig.yaml', db_label='foo_label')
->>> # New a `RWProxy` with configuration file
+>>> from dbman import RWProxy
 >>> proxy = RWProxy(db_config='dbconfig.yaml', db_label='foo_label')
->>> proxy.close()
->>> # New a `RWProxy` using basic configuration 
->>> with RWProxy() as proxy:
-...     pass
-...
->>> proxy = RWProxy()
 >>> table = [['x', 'y', 'z'], [1, 0, 0]]
 >>> proxy.todb(table, table_name='point', mode='create')  # create a table named 'point' in the schema 'foo'
 >>> proxy.fromdb('select * from point;')
@@ -42,6 +32,7 @@ Low Level Database I/O Adapter to A Pure Python Database Driver
 +===+===+===+
 | 1 | 0 | 0 |
 +---+---+---+
+
 >>> # insert None header table
 >>> proxy.todb([[2, 0, 0], [3, 0, 0]], table_name='point', mode='insert', with_header=False)  
 2
@@ -86,6 +77,17 @@ REPLACE INTO point VALUES (%s, %s, %s)
 INSERT INTO point (y, x, z) VALUES (9, 1, 9) ON DUPLICATE KEY UPDATE y=9, z=9
 INSERT INTO point (y, x, z) VALUES (9, 2, 9) ON DUPLICATE KEY UPDATE y=9, z=9
 INSERT INTO point (y, x, z) VALUES (9, 3, 9) ON DUPLICATE KEY UPDATE y=9, z=9
+>>> proxy.fromdb('select * from point;')
++---+---+---+
+| x | y | z |
++===+===+===+
+| 1 | 9 | 9 |
++---+---+---+
+| 2 | 9 | 9 |
++---+---+---+
+| 3 | 9 | 9 |
++---+---+---+
+
 >>> # prevent sql injection
 >>> proxy.fromdb('select * from point where x=%(input)s;', {'input': 1})
 +---+---+---+
@@ -109,8 +111,15 @@ Basic configuration for this module
 ##### ``.set``(db_config, db_label, [driver]): does basic configuration for this module.
 
 ```
->>> from dbman import BasicConfig
+>>> from dbman import BasicConfig, ConnectionProxy, RWProxy
 >>> BasicConfig.set(db_config='dbconfig.yaml', db_label='foo_label') 
+>>> proxy = RWProxy()
+>>> proxy.close()
+>>> # with statement Auto close connection/Auto commit.
+>>> with RWProxy() as cursor:  # with statement return cursor instead of ConnectionProxy
+...     cursor.execute('INSERT INTO point (y, x, z) VALUES (10, 10, 10);')
+...
+>>>
 ```
    
    
@@ -138,9 +147,6 @@ argument `driver` is a package name of underlying database drivers that clients 
 >>> proxy2.cursor(cursorclass=C2)                 # obtains a new customer cursor object depends on dirver 'pymysql'
 >>> proxy1.close()
 >>> proxy2.close()
->>> # with statement Auto close connection/Auto commit.
->>> with ConnectionProxy() as cursor:             # with statement return cursor instead of ConnectionProxy
->>>     cursor.execute('INSERT INTO point (y, x, z) VALUES (10, 10, 10);')
 ```
 
 # obtain a new connection, `BasicConfig.driver` will be used if the argument `driver` is omitted.

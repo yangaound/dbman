@@ -14,6 +14,7 @@ import abc
 import yaml
 import petl
 
+
 __version__ = '1.0.1'
 
 
@@ -33,16 +34,15 @@ class BasicConfig:
         E.g.,
         >>> # make a configuration file with yaml format
         >>> configuration = {
-        ... 'foo_label': {
+        ...  'foo_label': {
         ...     'driver': 'MySQLdb',
         ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'passwd': '', 'port': 3306, 'db': 'foo'},
         ...     },
-        ...
-        ... 'bar_label': {
+        ...  'bar_label': {
         ...     'driver': 'pymysql',
         ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'passwd': '', 'port': 3306, 'db': 'bar'},
         ...     },
-        ... 'baz_label': {
+        ...  'baz_label': {
         ...     'driver': 'pymssql',
         ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'password': '', 'port': 1433, 'database': 'baz'},
         ...     },
@@ -51,6 +51,7 @@ class BasicConfig:
         >>> with open('dbconfig.yaml', 'w') as fp:
         ...     yaml.dump(configuration, fp)
         ...
+        >>>
         >>> from dbman import BasicConfig, RWProxy
         >>> # does basic configuration
         >>> BasicConfig.set(db_config='dbconfig.yaml', db_label='foo_label')
