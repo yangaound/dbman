@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Source:
-    https://github.com/yangaound/dbman
-
 Created on 2016年12月24日
 
 @author: albin
@@ -26,47 +23,15 @@ class BasicConfig:
     # a package name of underlying database driver, 'pymysql' will be assumed by default.
     driver = 'pymysql'
 
-    @staticmethod
-    def set(db_config, db_label, driver=None, ):
-        """
-        Does basic configuration for this module.
+    @classmethod
+    def set(cls, db_config, db_label, driver=None, ):
+        """Does basic configuration for this module."""
+        cls.db_config = db_config
+        cls.db_label = db_label
+        cls.driver = driver or BasicConfig.driver
 
-        E.g.,
-        >>> # make a configuration file with yaml format
-        >>> configuration = {
-        ...  'foo_label': {
-        ...     'driver': 'pymysql',
-        ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'passwd': '', 'port': 3306, 'db': 'foo'},
-        ...     },
-        ...  'bar_label': {
-        ...     'driver': 'MySQLdb',
-        ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'passwd': '', 'port': 3306, 'db': 'bar'},
-        ...     },
-        ...  'baz_label': {
-        ...     'driver': 'pymssql',
-        ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'password': '', 'port': 1433, 'database': 'baz'},
-        ...     },
-        ... }
-        >>> import yaml
-        >>> with open('dbconfig.yaml', 'w') as fp:
-        ...     yaml.dump(configuration, fp)
-        ...
-        >>>
-        >>> from dbman import BasicConfig, ConnectionProxy, RWProxy
-        >>> # does basic configuration
-        >>> BasicConfig.set(db_config='dbconfig.yaml', db_label='foo_label')
-        >>> proxy = RWProxy()
-        >>> proxy.close()
-        >>> # with statement Auto close connection/Auto commit.
-        >>> with ConnectionProxy() as cursor:  # with statement return cursor instead of ConnectionProxy
-        ...     cursor.execute('INSERT INTO point (y, x, z) VALUES (10, 10, 10);')
-        ...
-        >>>
-        """
-
-        BasicConfig.db_config = db_config
-        BasicConfig.db_label = db_label
-        BasicConfig.driver = driver or BasicConfig.driver
+    def __init__(self):
+        raise NotImplementedError('can not initialize %s' % self.__class__)
 
 
 def connect(driver=None, **connect_kwargs):
@@ -86,32 +51,60 @@ def connect(driver=None, **connect_kwargs):
     return connection
 
 
-class ConnectionProxy(object):
-    """ This class obtains and maintains a connection to a schema
+def load_db_config(db_config):
+    with open(db_config) as f:
+        config = yaml.load(f)
+    return config
+
+
+class RWProxy(object):
+    """a connection proxy class which method `.fromdb()` for reading and `.todb()` from writing
     E.g.,
-    >>> from dbman import ConnectionProxy
-    >>> # instantialize `ConnectionProxy` with basic configuration
-    >>> proxy1 = ConnectionProxy()
-    >>> proxy1._driver                                # using underlying driver name
-    >>> proxy1._connection                            # binded connection object
-    >>> proxy1._cursor                                # associated cursor object
-    >>> proxy1.connection                             # a property that maintaines the associated connection object
-    >>> proxy1.cursor()                               # factory method that creates a cursor object
-    >>> # instantialize `ConnectionProxy` with basic configuration to schema 'bar'
+
+    >>> # make a configuration file with yaml format
+    >>> configuration = {
+    ...  'foo_label': {
+    ...     'driver': 'pymysql',
+    ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'passwd': '', 'port': 3306, 'db': 'foo'},
+    ...     },
+    ...  'bar_label': {
+    ...     'driver': 'MySQLdb',
+    ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'passwd': '', 'port': 3306, 'db': 'bar'},
+    ...     },
+    ...  'baz_label': {
+    ...     'driver': 'pymssql',
+    ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'password': '', 'port': 1433, 'database': 'baz'},
+    ...     },
+    ... }
+    >>> import yaml
+    >>> with open('dbconfig.yaml', 'w') as fp:
+    ...     yaml.dump(configuration, fp)
+    ...
+    >>> from dbman import BasicConfig, RWProxy
+    >>> # with statement auto close connection/auto commit.
+    >>> with RWProxy(db_config='dbconfig.yaml', db_label='foo_label') as proxy:
+    ...     proxy.cursor().execute('INSERT INTO point (y, x, z) VALUES (10, 10, 10);')
+    ...
+    >>> # does basic configuration for this module
+    >>> BasicConfig.set(db_config='dbconfig.yaml', db_label='foo_label')
+    >>> proxy1 = RWProxy()                           # use basic configuration
+    >>> proxy1._driver                               # using underlying driver name
+    >>> proxy1._connection                           # bound connection object
+    >>> proxy1.connection                            # connection property
+    >>> proxy1.cursor()                              # factory method that creates a cursor object
+    >>> # new a `RWProxy` with basic configuration to schema 'bar'
     >>> proxy2 = ConnectionProxy(db_label='bar_label')
     >>> from pymysql.cursors import DictCursor as C1
     >>> from MySQLdb.cursors import DictCursor as C2
-    >>> proxy1.cursor(cursorclass=C1)                 # obtains a new customer cursor object depends on dirver 'pymysql'
-    >>> proxy2.cursor(cursorclass=C2)                 # obtains a new customer cursor object depends on dirver 'MySQLdb'
+    >>> proxy1.cursor(cursorclass=C1)                # obtains a new customer cursor object depends on dirver 'pymysql'
+    >>> proxy2.cursor(cursorclass=C2)                # obtains a new customer cursor object depends on dirver 'MySQLdb'
     >>> proxy1.close()
     >>> proxy2.close()
-    >>> # with statement Auto close connection/Auto commit.
-    >>> with ConnectionProxy() as cursor:             # with statement return cursor instead of ConnectionProxy
-    >>>     cursor.execute('INSERT INTO point (y, x, z) VALUES (10, 10, 10);')
     """
 
-    def __init__(self, db_config=None, db_label=None, driver=None, ):
+    def __init__(self, connection=None, driver=None, db_config=None, db_label=None):
         """
+        :param connection: a connection object this proxy will associate with.
         :param db_config: a yaml file path, `BasicConfig.db_config` will be used if it's omitted.
         :param db_label: a string represents a schema, `BasicConfig.db_label` will be used if it's omitted.
         :param driver: package name of underlying database drivers that clients want to use, `BasicConfig.driver`
@@ -119,66 +112,34 @@ class ConnectionProxy(object):
         :type driver: `str` = {'pymysql' | 'MySQLdb' | 'pymssql'}
         """
 
-        db_config = db_config or BasicConfig.db_config
-        db_label = db_label or BasicConfig.db_label
-        driver = driver or BasicConfig.driver
-
-        if isinstance(db_config, basestring):
-            with open(db_config) as f:
-                yaml_obj = yaml.load(f)
-            self._driver = yaml_obj[db_label]['driver']
-            self.connect_kwargs = yaml_obj[db_label]['connect_kwargs']
-        elif db_config is None:
+        if connection:
+            assert driver, "argument driver is not present"
+            self._connection = connection                                     # binding connection
             self._driver = driver
-            self.connect_kwargs = {}
         else:
-            raise TypeError("Unexpected data type in argument 'db_config'")
-        self.writer = None  # dependency delegator for writing database
-        self._connection = connect(self._driver, **self.connect_kwargs)  # associated connection
-        self._cursor = self._connection.cursor()  # associated cursor
+            db_config = db_config or BasicConfig.db_config
+            db_label = db_label or BasicConfig.db_label
+            driver = driver or BasicConfig.driver
+            if db_config is None:
+                self._driver = driver
+                self._connect_kwargs = {}
+            elif isinstance(db_config, basestring):
+                config = load_db_config(db_config)
+                self._driver = config[db_label]['driver']
+                self._connect_kwargs = config[db_label]['connect_kwargs']
+            else:
+                raise TypeError('Unexpected data type in argument "db_config"')
+            self._connection = connect(self._driver, **self._connect_kwargs)  # binding connection
+        self.writer = None                                                    # for loading data to database
 
     def __enter__(self):
-        """with statement return a cursor instead of a ``dbman.ConnectionProxy``"""
-        return self.cursor()
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """commit if successful otherwise rollback"""
         self.connection.rollback() if exc_type else self.connection.commit()
         self.close()
         return False
-
-    @property
-    def connection(self):
-        if hasattr(self._connection, 'open') and not self._connection.open:
-            self._connection = connect(self._driver, **self.connect_kwargs)
-        return self._connection
-
-    def cursor(self, **kwargs):
-        """cursor factory method"""
-        return self.connection.cursor(**kwargs)
-
-    def close(self):
-        self._cursor.close()
-        self._connection.close()
-
-
-class RWProxy(ConnectionProxy):
-    """This class inherits `dbman.ConnectionProxy` and add 2 methods: `fromdb` for read and `todb` for write"""
-
-    def __init__(self, db_config=None, db_label=None, driver=None, connection=None):
-        """    
-        :param connection: a connection object this proxy will associate with. if `connection` is `None`, arguments
-          `db_config`, `db_label` and `driver` will be passed to supper to obtain a connection.
-        """
-        if connection:
-            self._connection = connection
-            self._driver = driver or BasicConfig.driver
-        else:
-            super(RWProxy, self).__init__(db_config=db_config, db_label=db_label, driver=driver)
-
-    def __enter__(self):
-        """overwrite"""
-        return self
 
     def fromdb(self, select_stmt, args=None, latency=False):
         """argument `select_stmt` and `args` will be passed to the underlying API `cursor.execute()`.
@@ -189,43 +150,56 @@ class RWProxy(ConnectionProxy):
 
     def todb(self, table, table_name, mode='insert', with_header=True, slice_size=128, duplicate_key=()):
         """
-        :param table: a `petl.util.base.Table` or a sequence like: [header, row1, row2, ...] or [row1, row2, ...]
-        :param table_name: the name of a table in this database
+        :param table: a `petl.util.base.Table` or a sequence like this:
+            [header, row1, row2, ...] or [row1, row2, ...]
+        :param table_name: the name of a table in connected database
         :param mode:
             execute SQL INSERT INTO Statement if `mode` equal to 'insert'.
             execute SQL REPLACE INTO Statement if `mode` equal to 'replace'.
             execute SQL INSERT ... ON DUPLICATE KEY UPDATE Statement if `mode` equal to 'update'.
-            execute SQL TRUNCATE TABLE Statement and then execute SQL INSERT INTO Statement if `mode` equal to 'truncate'.
-            create a table and insert data into it if `mode` equal to 'create', this operation depends `SqlAlchemy`.
+            execute SQL INSERT INTO Statement before attempting to execute SQL TRUNCATE TABLE Statement
+                if `mode` equal to 'truncate'.
+            execute SQL INSERT INTO Statement before attempting to automatically create a database table which requires
+              `SQLAlchemy <http://www.sqlalchemy.org/>` to be installed if `mode` equal to 'create'
         :param duplicate_key: it must be present if the argument `mode` is 'update', otherwise it will be ignored.
         :param with_header: specify `True` if the argument `table` with header, otherwise `False`.
         :param slice_size: the `table` will be slice to many subtable with `slice_size`, 1 transaction for 1 subtable.
         """
         mode = mode.upper()
         if mode == 'CREATE':
-            return self._create_table(table, table_name=table_name)
-
+            from petl.io.db_create import create_table
+            create_table(table, self.connection, table_name)
+            mode = 'INSERT'
         if mode == 'TRUNCATE':
             self.cursor().execute("TRUNCATE TABLE `%(table_name)s`;", {'table_name': table_name})
             mode = 'INSERT'
-        self.writer = self._make_writer(connection=self.connection, table=table, table_name=table_name, mode=mode,
-                                        with_header=with_header, slice_size=slice_size, duplicate_key=duplicate_key)
+        kwargs = {
+            'connection': self.connection,
+            'table': table,
+            'table_name': table_name,
+            'with_header': with_header,
+            'slice_size': slice_size,
+        }
+        if (mode == 'UPDATE') and self._driver and ('MYSQL' in self._driver.upper()):
+            self.writer = _UpdatingWriter(duplicate_key=duplicate_key, **kwargs)
+        elif mode == 'INSERT':
+            self.writer = _InsertingWriter(**kwargs)
+        elif mode == 'REPLACE':
+            self.writer = _ReplacingWriter(**kwargs)
+        else:
+            raise AssertionError('The driver "%s" can not handle this mode "%s"' % (self._driver, mode))
         return self.writer.write()
 
-    def _make_writer(self, **kwargs):
-        mode = kwargs.get('mode').upper()
-        if (mode == 'UPDATE') and self._driver and ('MYSQL' in self._driver.upper()):
-            writer = _UpdateDuplicateWriter(**kwargs)
-        elif mode in ('INSERT', 'REPLACE'):
-            writer = _InsertReplaceWriter(**kwargs)
-        else:
-            raise AssertionError("The driver '%s' can't handle this request" % self._driver)
-        return writer
+    @property
+    def connection(self):
+        return self._connection
 
-    def _create_table(self, table, table_name, **petl_kwargs):
-        if self._driver and ('MYSQL' in self._driver.upper()):
-            self.cursor().execute('SET SQL_MODE=ANSI_QUOTES')
-        petl.todb(table, self.connection, table_name, create=True, **petl_kwargs)
+    def cursor(self, **kwargs):
+        """cursor factory method"""
+        return self.connection.cursor(**kwargs)
+
+    def close(self):
+        self._connection.close()
 
 
 class _WriterInterface(object):
@@ -233,22 +207,21 @@ class _WriterInterface(object):
 
     @abc.abstractmethod
     def make_sql(self):
-        """:return collections.Iterator<basestring>, where basestring is a SQL Statement"""
+        """:return collections.Iterable<unicode>, where unicode is a valid SQL Statement"""
 
     @abc.abstractmethod
     def write(self):
         """load data to database"""
 
 
-class _InsertReplaceWriter(_WriterInterface):
+class _InsertingWriter(_WriterInterface):
+    SQL_MODE = 'INSERT INTO'
 
-    def __init__(self, connection, table, table_name, with_header, mode, slice_size, duplicate_key):
-        assert mode in ('INSERT', 'REPLACE'), "Unsupported operation mode '%s'" % mode
+    def __init__(self, connection, table, table_name, slice_size, with_header):
         self.connection = connection
         self.table_name = table_name
-        self.with_header = with_header
-        self.mode = mode
         self.slice_size = slice_size
+        self.with_header = with_header
 
         sequence = table.tuple() if isinstance(table, petl.util.base.Table) else table
         if self.with_header:
@@ -265,8 +238,8 @@ class _InsertReplaceWriter(_WriterInterface):
         affected_row_count = 0
         for sub_table in self.slice_table():
             num = cursor.executemany(sql, sub_table)
+            affected_row_count += num
             self.connection.commit()
-            affected_row_count += (num or 0)
         return affected_row_count
 
     def slice_table(self):
@@ -281,43 +254,32 @@ class _InsertReplaceWriter(_WriterInterface):
 
     def make_sql(self):
         if self.header is not None:
-            fields = u', '.join(self.header)
-            values_fmt = u', '.join(('%s',) * len(self.header))
-            sql = u"%s INTO %s (%s) VALUES (%s)" % (self.mode.upper(), self.table_name, fields, values_fmt)
+            fields_sql = u', '.join(self.header)
+            values_sql = u', '.join(('%s',) * len(self.header))
+            sql = u"%s %s (%s) VALUES (%s)" % (self.SQL_MODE, self.table_name, fields_sql, values_sql)
         else:
-            values_fmt = u', '.join(('%s',) * len(self.content[0]))
-            sql = u"%s INTO %s VALUES (%s)" % (self.mode.upper(), self.table_name, values_fmt)
+            values_sql = u', '.join(('%s',) * len(self.content[0]))
+            sql = u"%s %s VALUES (%s)" % (self.SQL_MODE, self.table_name, values_sql)
         yield sql
 
 
-class _UpdateDuplicateWriter(_WriterInterface):
-    import_mode = ('UPDATE',)
+class _ReplacingWriter(_InsertingWriter):
+    SQL_MODE = 'REPLACE INTO'
 
-    def __init__(self, connection, table, table_name, with_header, mode, slice_size, duplicate_key):
-        assert mode == 'UPDATE', "Unsupported operation mode '%s'" % mode
+
+class _UpdatingWriter(_WriterInterface):
+    def __init__(self, connection, table, table_name, slice_size, with_header, duplicate_key):
         assert duplicate_key, 'argument duplicate_key must be specified'
         assert with_header, 'argument table has not header'
         self.connection = connection
+        self.table = table if isinstance(table, petl.util.base.Table) else petl.wrap(table)
         self.table_name = table_name
-        self.with_header = with_header
-        self.mode = mode
         self.slice_size = slice_size
         self.duplicate_key = duplicate_key
-        self.content = table if isinstance(table, petl.util.base.Table) else petl.wrap(table)
-
-    @staticmethod
-    def obj2sql(obj):
-        if isinstance(obj, numbers.Number):
-            sql = str(obj)
-        elif isinstance(obj, basestring):
-            sql = u"'%s'" % obj.replace("'", "''")
-        else:
-            sql = u"'%s'" % obj
-        return sql
 
     def make_sql(self):
         sql_statement_fmt = u"INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s"
-        for row in self.content.dicts():
+        for row in self.table.dicts():
             dic = dict((k, v) for k, v in row.items() if v is not None)
             keys = dic.keys()
             keys_sql = ', '.join(keys)
@@ -337,3 +299,13 @@ class _UpdateDuplicateWriter(_WriterInterface):
             affected_row_count += (num or 0)
         self.connection.commit()
         return affected_row_count
+
+    @staticmethod
+    def obj2sql(obj):
+        if isinstance(obj, numbers.Number):
+            sql = str(obj)
+        elif isinstance(obj, basestring):
+            sql = u"'%s'" % obj.replace("'", "''")
+        else:
+            sql = u"'%s'" % obj
+        return sql

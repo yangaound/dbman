@@ -1,7 +1,7 @@
 # dbman
 Low Level Database I/O Adapter to A Pure Python Database Driver
 
-# QuickStart
+# Demo
 ```
 >>> # make a configuration file with yaml format
 >>> configuration = {
@@ -113,43 +113,15 @@ Basic configuration for this module
 ```
 >>> from dbman import BasicConfig, ConnectionProxy, RWProxy
 >>> BasicConfig.set(db_config='dbconfig.yaml', db_label='foo_label') 
->>> proxy = RWProxy()
->>> proxy.close()
->>> # with statement Auto close connection/Auto commit.
->>> with ConnectionProxy() as cursor:  # with statement return cursor instead of ConnectionProxy
-...     cursor.execute('INSERT INTO point (y, x, z) VALUES (10, 10, 10);')
+>>> # with statement auto close connection/auto commit.
+>>> with RWProxy() as proxy:
+...     proxy.cursor().execute('INSERT INTO point (y, x, z) VALUES (10, 10, 10);')
 ...
 >>>
 ```
-   
-   
-### class ``dbman.ConnectionProxy``([db_config, [db_label, [driver]]]):
-This class obtains and maintains a connection to a schema.
-argument `db_config` is a yaml file path, `BasicConfig.db_config` will be used if it's omitted.
-argument `db_label` is a string represents a schema, `BasicConfig.db_label` will be used if it's omitted.
-argument `driver` is a package name of underlying database drivers that clients want to use, `BasicConfig.driver`
-      will be used if it's omitted.
-	
-```
->>> from dbman import ConnectionProxy
->>> # instantialize `ConnectionProxy` with basic configuration
->>> proxy1 = ConnectionProxy()
->>> proxy1._driver                                # using underlying driver name
->>> proxy1._connection                            # binded connection object
->>> proxy1._cursor                                # associated cursor object
->>> proxy1.connection                             # a property that maintaines the associated connection object
->>> proxy1.cursor()                               # factory method that creates a cursor object
->>> # instantialize `ConnectionProxy` with basic configuration to schema 'bar'
->>> proxy2 = ConnectionProxy(db_label='bar_label')
->>> from pymysql.cursors import DictCursor as C1
->>> from MySQLdb.cursors import DictCursor as C2
->>> proxy1.cursor(cursorclass=C1)                 # obtains a new customer cursor object depends on dirver 'pymysql'
->>> proxy2.cursor(cursorclass=C2)                 # obtains a new customer cursor object depends on dirver 'MySQLdb'
->>> proxy1.close()
->>> proxy2.close()
-```
+   	
 
-# obtain a new connection, `BasicConfig.driver` will be used if the argument `driver` is omitted.
+# Obtain a new connection, `BasicConfig.driver` will be used if the argument `driver` is omitted.
 ```
 >>> from dbman import connect
 >>> connect(host='localhost', user='root', passwd='', port=3306, db='foo')
@@ -158,11 +130,14 @@ argument `driver` is a package name of underlying database drivers that clients 
 >>> connect(driver='pymssql', host='localhost', user='root', password='', port=1433, database='baz') 
 ```
 
-### class ``dbman.RWProxy``([db_config, [db_label, [driver, [
-]]]]):
-This class inherits `dbman.ConnectionProxy` and add 2 methods: `fromdb()` for read and `todb()` for write.
-if the argument connection is no None, this proxy will bind with, otherwise `db_config`, `db_label` and `driver` 
-will be passed to supper to obtain a connection.
+### class ``dbman.RWProxy``([connection, [driver, [db_config, [db_label]]]]):
+A connection proxy class which method `.fromdb()` for reading and `.todb()` for writing.
+The argument `connection` should be an connection object this proxy bind with 
+The argument `driver` is a package name of underlying database drivers that clients want to use, `BasicConfig.driver`
+      will be used if it's omitted.
+The argument `db_config` is a yaml file path, `BasicConfig.db_config` will be used if it's omitted.
+The argument `db_label` is a string represents a schema, `BasicConfig.db_label` will be used if it's omitted.
+
 
 ### `RWProxy.fromdb`(select_stmt, args=None, latency=True)
 Argument `select_stmt` and `args` will be passed to the underlying API `cursor.execute()`.
