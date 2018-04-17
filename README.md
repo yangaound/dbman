@@ -111,7 +111,7 @@ Basic configuration for this module
 ##### ``.set``(db_config, db_label, [driver]): does basic configuration for this module.
 
 ```
->>> from dbman import BasicConfig, ConnectionProxy, RWProxy
+>>> from dbman import BasicConfig, RWProxy
 >>> BasicConfig.set(db_config='dbconfig.yaml', db_label='foo_label') 
 >>> # with statement auto close connection/auto commit.
 >>> with RWProxy() as proxy:
@@ -139,7 +139,7 @@ The argument `db_config` is a yaml file path, `BasicConfig.db_config` will be us
 The argument `db_label` is a string represents a schema, `BasicConfig.db_label` will be used if it's omitted.
 
 
-### `RWProxy.fromdb`(select_stmt, args=None, latency=True)
+### `RWProxy.fromdb`(select_stmt, args=None, latency=False)
 Argument `select_stmt` and `args` will be passed to the underlying API `cursor.execute()`.
 fetch and wrap all data immediately if the argument `latency` is `False`
 
@@ -150,11 +150,13 @@ the argumen `table` can be a `petl.util.base.Table`
 or a sequence like: [header, row1, row2, ...] or [row1, row2, ...].<br />
 the argument `table_name` is the name of a table in this schema.<br />
 the argument `mode`:<br />
-	execute SQL INSERT INTO Statement if `mode` equal to 'insert'.<br />
-	execute SQL REPLACE INTO Statement if `mode` equal to 'replace'.<br />
-	execute SQL INSERT ... ON DUPLICATE KEY UPDATE Statement if `mode` equal to 'update'(only mysql).<br />
- 	execute SQL TRUNCATE TABLE Statement and then execute SQL INSERT INTO Statement if `mode` equal to 'truncate'.<br />
-	create a table and insert data into it if `mode` equal to 'create'.
+    execute SQL INSERT INTO Statement if `mode` equal to 'insert'.<br/>
+    execute SQL REPLACE INTO Statement if `mode` equal to 'replace'.<br/>
+    execute SQL INSERT ... ON DUPLICATE KEY UPDATE Statement if `mode` equal to 'update'.<br/>
+    execute SQL INSERT INTO Statement before attempting to execute SQL TRUNCATE TABLE Statement
+        if `mode` equal to 'truncate'.<br/>
+    execute SQL INSERT INTO Statement before attempting to automatically create a database table which requires
+      `SQLAlchemy <http://www.sqlalchemy.org/>` to be installed if `mode` equal to 'create'<br/>
 the argument `duplicate_key` must be present if the argument `mode` is 'update', otherwise it will be ignored.<br />
 the argument `with_header` should be `True` if the argument `table` with header, otherwise `False`.<br />
 the argument `slice_size` used to slice `table` into many subtable with `slice_size`, 1 transaction for 1 subtable.<br />
