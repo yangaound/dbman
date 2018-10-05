@@ -18,12 +18,14 @@ Low Level Database I/O Adapter to A Pure Python Database Driver
 ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'password': '', 'port': 1433, 'database': 'baz'},
 ...     },
 ... }
+>>> import os
 >>> import yaml
->>> with open('dbconfig.yaml', 'w') as fp:
+>>> db_conf_path = os.path.join(os.path.expanduser("~"), 'dbconfig.yaml')
+>>> with open(db_conf_path, 'w') as fp:
 ...     yaml.dump(configuration, fp)
 ...
 >>> from dbman import RWProxy
->>> proxy = RWProxy(db_config='dbconfig.yaml', db_label='foo_label')
+>>> proxy = RWProxy(db_config=db_conf_path, db_label='foo_label')
 >>> table = [['x', 'y', 'z'], [1, 0, 0]]
 >>> proxy.todb(table, table_name='point', mode='create')  # create a table named 'point' in the schema 'foo'
 >>> proxy.fromdb('select * from point;')
@@ -112,7 +114,7 @@ Basic configuration for this module
 
 ```
 >>> from dbman import BasicConfig, RWProxy
->>> BasicConfig.set(db_config='dbconfig.yaml', db_label='foo_label') 
+>>> BasicConfig.set(db_config=db_conf_path, db_label='foo_label') 
 >>> # with statement auto close connection/auto commit.
 >>> with RWProxy() as proxy:
 ...     proxy.cursor().execute('INSERT INTO point (y, x, z) VALUES (10, 10, 10);')
@@ -132,7 +134,7 @@ Basic configuration for this module
 
 ### class ``dbman.RWProxy``([connection, [driver, [db_config, [db_label]]]]):
 A connection proxy class which method `.fromdb()` for reading and `.todb()` for writing.
-The argument `connection` should be an connection object this proxy bind with 
+The argument `connection` should be an connection object this proxy bind with.
 The argument `driver` is a package name of underlying database drivers that clients want to use, `BasicConfig.driver`
       will be used if it's omitted.
 The argument `db_config` is a yaml file path, `BasicConfig.db_config` will be used if it's omitted.
