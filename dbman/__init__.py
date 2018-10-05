@@ -17,11 +17,11 @@ __version__ = '1.0.1'
 
 
 class BasicConfig:
-    # configuration file path with yaml format
+    # default configuration file path
     db_config = os.path.join(os.path.expanduser("~"), 'dbconfig.yaml')
     # a string represents default database schema
     db_label = None
-    # a package name of underlying database driver, 'pymysql' will be assumed by default.
+    # default package name of underlying database driver.
     driver = 'pymysql'
 
     @classmethod
