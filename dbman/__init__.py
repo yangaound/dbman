@@ -5,6 +5,7 @@ Created on 2016年12月24日
 @author: albin
 """
 
+import os
 import numbers
 import abc
 
@@ -17,7 +18,7 @@ __version__ = '1.0.1'
 
 class BasicConfig:
     # configuration file path with yaml format
-    db_config = None
+    db_config = os.path.join(os.path.expanduser("~"), 'dbconfig.yaml')
     # a string represents default database schema
     db_label = None
     # a package name of underlying database driver, 'pymysql' will be assumed by default.
@@ -76,8 +77,10 @@ class RWProxy(object):
     ...     'connect_kwargs': {'host': 'localhost', 'user': 'root', 'password': '', 'port': 1433, 'database': 'baz'},
     ...     },
     ... }
+    >>> import os
     >>> import yaml
-    >>> with open('dbconfig.yaml', 'w') as fp:
+    >>> db_conf_path = os.path.join(os.path.expanduser("~"), 'dbconfig.yaml')
+    >>> with open(db_conf_path, 'w') as fp:
     ...     yaml.dump(configuration, fp)
     ...
     >>> from dbman import BasicConfig, RWProxy
@@ -181,11 +184,11 @@ class RWProxy(object):
             'slice_size': slice_size,
         }
         if (mode == 'UPDATE') and self._driver and ('MYSQL' in self._driver.upper()):
-            self.writer = _UpdatingWriter(duplicate_key=duplicate_key, **kwargs)
+            self.writer = _MySQLUpdating(duplicate_key=duplicate_key, **kwargs)
         elif mode == 'INSERT':
             self.writer = _InsertingWriter(**kwargs)
         elif mode == 'REPLACE':
-            self.writer = _ReplacingWriter(**kwargs)
+            self.writer = _MySQLReplacing(**kwargs)
         else:
             raise AssertionError('The driver "%s" can not handle this mode "%s"' % (self._driver, mode))
         return self.writer.write()
@@ -263,11 +266,11 @@ class _InsertingWriter(_WriterInterface):
         yield sql
 
 
-class _ReplacingWriter(_InsertingWriter):
+class _MySQLReplacing(_InsertingWriter):
     SQL_MODE = 'REPLACE INTO'
 
 
-class _UpdatingWriter(_WriterInterface):
+class _MySQLUpdating(_WriterInterface):
     def __init__(self, connection, table, table_name, slice_size, with_header, duplicate_key):
         assert duplicate_key, 'argument duplicate_key must be specified'
         assert with_header, 'argument table has not header'
@@ -280,11 +283,10 @@ class _UpdatingWriter(_WriterInterface):
     def make_sql(self):
         sql_statement_fmt = u"INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s"
         for row in self.table.dicts():
-            dic = dict((k, v) for k, v in row.items() if v is not None)
-            keys = dic.keys()
+            keys = row.keys()
             keys_sql = ', '.join(keys)
-            values_sql = ', '.join(map(self.obj2sql, dic.values()))
-            update_items = map(lambda field: u"%s=%s" % (field, self.obj2sql(dic[field])),
+            values_sql = ', '.join(map(self.obj2sql, row.values()))
+            update_items = map(lambda field: u"%s=%s" % (field, self.obj2sql(row[field])),
                                (k for k in keys if k not in self.duplicate_key))
             update_items_sql = ', '.join(update_items)
             yield sql_statement_fmt % (self.table_name, keys_sql, values_sql, update_items_sql)
@@ -302,7 +304,9 @@ class _UpdatingWriter(_WriterInterface):
 
     @staticmethod
     def obj2sql(obj):
-        if isinstance(obj, numbers.Number):
+        if obj is None:
+            sql = '\\N'
+        elif isinstance(obj, numbers.Number):
             sql = str(obj)
         elif isinstance(obj, basestring):
             sql = u"'%s'" % obj.replace("'", "''")
