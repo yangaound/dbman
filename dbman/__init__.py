@@ -151,7 +151,7 @@ class RWProxy(object):
         temp = petl.fromdb(self.connection, select_stmt, args)
         return temp if latency else petl.wrap([row for row in temp])
 
-    def todb(self, table, table_name, mode='insert', with_header=True, slice_size=128, duplicate_key=()):
+    def todb(self, table, table_name, mode='insert', with_header=True, slice_size=128, unique_key=()):
         """
         :param table: a `petl.util.base.Table` or a sequence like this:
             [header, row1, row2, ...] or [row1, row2, ...]
@@ -164,7 +164,7 @@ class RWProxy(object):
                 if `mode` equal to 'truncate'.
             execute SQL INSERT INTO Statement before attempting to automatically create a database table which requires
               `SQLAlchemy <http://www.sqlalchemy.org/>` to be installed if `mode` equal to 'create'
-        :param duplicate_key: it must be present if the argument `mode` is 'update', otherwise it will be ignored.
+        :param unique_key: it must be present if the argument `mode` is 'update', otherwise it will be ignored.
         :param with_header: specify `True` if the argument `table` with header, otherwise `False`.
         :param slice_size: the `table` will be slice to many subtable with `slice_size`, 1 transaction for 1 subtable.
         """
@@ -184,7 +184,7 @@ class RWProxy(object):
             'slice_size': slice_size,
         }
         if (mode == 'UPDATE') and self._driver and ('MYSQL' in self._driver.upper()):
-            self.writer = _MySQLUpdating(duplicate_key=duplicate_key, **kwargs)
+            self.writer = _MySQLUpdating(unique_key=unique_key, **kwargs)
         elif mode == 'INSERT':
             self.writer = _InsertingWriter(**kwargs)
         elif mode == 'REPLACE':
@@ -271,14 +271,14 @@ class _MySQLReplacing(_InsertingWriter):
 
 
 class _MySQLUpdating(_WriterInterface):
-    def __init__(self, connection, table, table_name, slice_size, with_header, duplicate_key):
-        assert duplicate_key, 'argument duplicate_key must be specified'
+    def __init__(self, connection, table, table_name, slice_size, with_header, unique_key):
+        assert unique_key, 'argument unique_key must be specified'
         assert with_header, 'argument table has not header'
         self.connection = connection
         self.table = table if isinstance(table, petl.util.base.Table) else petl.wrap(table)
         self.table_name = table_name
         self.slice_size = slice_size
-        self.duplicate_key = duplicate_key
+        self.unique_key = unique_key
 
     def make_sql(self):
         sql_statement_fmt = u"INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s"
@@ -287,7 +287,7 @@ class _MySQLUpdating(_WriterInterface):
             keys_sql = ', '.join(keys)
             values_sql = ', '.join(map(self.obj2sql, row.values()))
             update_items = map(lambda field: u"%s=%s" % (field, self.obj2sql(row[field])),
-                               (k for k in keys if k not in self.duplicate_key))
+                               (k for k in keys if k not in self.unique_key))
             update_items_sql = ', '.join(update_items)
             yield sql_statement_fmt % (self.table_name, keys_sql, values_sql, update_items_sql)
 
