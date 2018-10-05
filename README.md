@@ -146,7 +146,7 @@ Argument `select_stmt` and `args` will be passed to the underlying API `cursor.e
 fetch and wrap all data immediately if the argument `latency` is `False`
 
 
-### `RWProxy.todb`(table, table_name, mode='insert', with_header=True, slice_size=128, duplicate_key=())
+### `RWProxy.todb`(table, table_name, mode='insert', with_header=True, slice_size=128, unique_key=())
 this method return a number that describes affected row number<br/>
 the argumen `table` can be a `petl.util.base.Table` 
 or a sequence like: [header, row1, row2, ...] or [row1, row2, ...].<br />
@@ -159,6 +159,6 @@ the argument `mode`:<br />
         if `mode` equal to 'truncate'.<br/>
     execute SQL INSERT INTO Statement before attempting to automatically create a database table which requires
       `SQLAlchemy <http://www.sqlalchemy.org/>` to be installed if `mode` equal to 'create'<br/>
-the argument `duplicate_key` must be present if the argument `mode` is 'update', otherwise it will be ignored.<br />
+the argument `unique_key` must be present if the argument `mode` is 'update', otherwise it will be ignored.<br />
 the argument `with_header` should be `True` if the argument `table` with header, otherwise `False`.<br />
 the argument `slice_size` used to slice `table` into many subtable with `slice_size`, 1 transaction for 1 subtable.<br />
