@@ -71,7 +71,7 @@ Low Level Database I/O Adapter to A Pure Python Database Driver
 REPLACE INTO point VALUES (%s, %s, %s)
 >>> table = [['x', 'y', 'z'], [1, 9, 9], [2, 9, 9], [3, 9, 9]]
 >>> # updatet if the key 'x' is duplicated otherwise insert
->>> proxy.todb(table, table_name='point', mode='update', duplicate_key=('x', )) 
+>>> proxy.todb(table, table_name='point', mode='update', unique_key=('x', )) 
 6
 >>> for sql in proxy.writer.make_sql():
 ...     print sql
