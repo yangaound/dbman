@@ -242,7 +242,7 @@ class WriterInterface(object):
             self._fields_q(),
             self._values_f(),
             self.POSTFIX,
-            self._update_items_q(),
+            self._items_q(),
         )
 
     def __slice_table(self):
@@ -264,13 +264,13 @@ class WriterInterface(object):
         else:
             return "`%s`" % table_name
 
-    def _fields_q(self):
-        return u', '.join(["`%s`" % f for f in self.header])
+    def _fields_q(self, header=None):
+        return u', '.join(["`%s`" % f for f in header or self.header])
 
     def _values_f(self):
         return u', '.join(('%s',) * len(self.header))
 
-    def _update_items_q(self):
+    def _items_q(self):
         return ''
 
     def _to_q(self, obj):
@@ -294,12 +294,12 @@ class WriterInterface(object):
 class _InsertingWriter(WriterInterface):
 
     def make_sql(self):
-        for dic in self.table.dicts():
+        for row in self.table.dicts():
             sql = u"%s %s (%s) VALUES (%s)" % (
                 self.PREFIX,
                 self._table_name_q(),
-                self._fields_q(),
-                u', '.join(map(self._to_q, dic.values()))
+                self._fields_q(row.keys()),
+                u', '.join(map(self._to_q, row.values()))
             )
             yield sql
 
@@ -316,19 +316,16 @@ class _MySQLUpdating(WriterInterface):
         self.unique_key = unique_key
         assert unique_key, 'argument unique_key must be specified'
 
-    def _update_items_q(self):
-        return ', '.join(map(lambda f: u"%s=VALUES(%s)" % (f, f), (f for f in self.header if f not in self.unique_key)))
+    def _items_q(self):
+        return ', '.join(map(lambda f: u"`%s`=VALUES(`%s`)" % (f, f), (f for f in self.header if f not in self.unique_key)))
 
     def make_sql(self):
         for row in self.table.dicts():
-            values_sql = ', '.join(map(self._to_q, row.values()))
-            update_items = map(lambda f: u"%s=%s" % (f, self._to_q(row[f])), (k for k in row.keys() if k not in self.unique_key))
-            update_items_sql = ', '.join(update_items)
             yield u"%s %s(%s) VALUES (%s) %s %s" % (
                 self.PREFIX,
                 self._table_name_q(),
-                self._fields_q(),
-                values_sql,
+                self._fields_q(row.keys()),
+                ', '.join(map(self._to_q, row.values())),
                 self.POSTFIX,
-                update_items_sql,
+                self._items_q(),
             )
