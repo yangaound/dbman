@@ -24,20 +24,25 @@ Low Level Database I/O Adapter to A Pure Python Database Driver
 >>> with open(db_conf_path, 'w') as fp:
 ...     yaml.dump(configuration, fp)
 ...
->>> from dbman import RWProxy
->>> proxy = RWProxy(db_config=db_conf_path, db_label='foo_label')
->>> table = [['x', 'y', 'z'], [1, 0, 0]]
+>>> # does basic configuration for this module
+>>> from dbman import BasicConfig, Proxy
+>>> BasicConfig.set(db_config=db_conf_path, db_label='foo_label')
+>>> proxy = Proxy()                             # use basic configuration
+>>> proxy._driver                               # using underlying driver name
+>>> proxy._connection                           # bound connection for proxy
+>>> proxy.connection                            # property that reference to the bound connection
+>>> proxy.cursor()                              # factory method that creates a cursor object
+>>> proxy.close()
+>>>
+>>> # with statement auto commit/close.
+>>> with Proxy(db_config=db_conf_path, db_label='foo_label') as proxy:
+...     proxy.cursor().execute('INSERT INTO point (y, x, z) VALUES (10, 10, 10);')
+...
+>>> from dbman import Proxy
+>>> proxy = Proxy(db_config=db_conf_path, db_label='foo_label')
+>>> table = [['x', 'y', 'z'], [1, 0, 0], [2, 0, 0], [3, 0, 0]]
 >>> proxy.todb(table, table_name='point', mode='create')  # create a table named 'point' in the schema 'foo'
->>> proxy.fromdb('select * from point;')
-+---+---+---+
-| x | y | z |
-+===+===+===+
-| 1 | 0 | 0 |
-+---+---+---+
-
->>> # insert None header table
->>> proxy.todb([[2, 0, 0], [3, 0, 0]], table_name='point', mode='insert', with_header=False)  
-2
+3
 >>> proxy.fromdb('select * from point;')
 +---+---+---+
 | x | y | z |
@@ -52,7 +57,7 @@ Low Level Database I/O Adapter to A Pure Python Database Driver
 >>> proxy.cursor().execute('ALTER TABLE `point` ADD PRIMARY KEY(`x`);')  # set field 'x' as primary key
 0
 >>> # replace rows with the same pk(key 'x')
->>> proxy.todb([[2, 5, 0], [3, 5, 0]], table_name='point', mode='replace', with_header=False)
+>>> proxy.todb([['x', 'y', 'z'], [2, 5, 0], [3, 5, 0]], table_name='point', mode='replace')
 4
 >>> proxy.fromdb('select * from point;')
 +---+---+---+
@@ -65,20 +70,25 @@ Low Level Database I/O Adapter to A Pure Python Database Driver
 | 3 | 5 | 0 |
 +---+---+---+
 
->>> for sql in proxy.writer.make_sql():   # check executed sql statement
+>>> for sql in proxy.writer.make_sql():   # debug sql statement
 ...     print sql
 ...
-REPLACE INTO point VALUES (%s, %s, %s)
->>> table = [['x', 'y', 'z'], [1, 9, 9], [2, 9, 9], [3, 9, 9]]
+REPLACE INTO `point` (`x`, `y`, `z`) VALUES (5, 2, 0)
+REPLACE INTO `point` (`x`, `y`, `z`) VALUES (5, 3, 0)
+>>> table = [
+... {'y': 9, 'x': 1, 'z': 9},
+... {'y': 9, 'x': 2, 'z': 9},
+... {'y': 9, 'x': 3, 'z': 9},
+... ]
 >>> # updatet if the key 'x' is duplicated otherwise insert
 >>> proxy.todb(table, table_name='point', mode='update', unique_key=('x', )) 
 6
->>> for sql in proxy.writer.make_sql():
+>>> for sql in proxy.writer.make_sql():   # debug sql statement
 ...     print sql
 ...
-INSERT INTO point (y, x, z) VALUES (9, 1, 9) ON DUPLICATE KEY UPDATE y=9, z=9
-INSERT INTO point (y, x, z) VALUES (9, 2, 9) ON DUPLICATE KEY UPDATE y=9, z=9
-INSERT INTO point (y, x, z) VALUES (9, 3, 9) ON DUPLICATE KEY UPDATE y=9, z=9
+INSERT INTO `point`(`x`, `y`, `z`) VALUES (9, 1, 9) ON DUPLICATE KEY UPDATE y=9, z=9
+INSERT INTO `point`(`x`, `y`, `z`) VALUES (9, 2, 9) ON DUPLICATE KEY UPDATE y=9, z=9
+INSERT INTO `point`(`x`, `y`, `z`) VALUES (9, 3, 9) ON DUPLICATE KEY UPDATE y=9, z=9
 >>> proxy.fromdb('select * from point;')
 +---+---+---+
 | x | y | z |
@@ -90,16 +100,9 @@ INSERT INTO point (y, x, z) VALUES (9, 3, 9) ON DUPLICATE KEY UPDATE y=9, z=9
 | 3 | 9 | 9 |
 +---+---+---+
 
->>> # prevent sql injection
->>> proxy.fromdb('select * from point where x=%(input)s;', {'input': 1})
-+---+---+---+
-| x | y | z |
-+===+===+===+
-| 1 | 9 | 9 |
-+---+---+---+
 >>> # slice a big table into many sub-table with specified size, 1 subtable 1 transaction.
 >>> big_table = [[1, 88, 88], [2, 88, 88] ......]
->>> proxy.todb(big_table, table_name='point', with_header=False, slice_size=128)
+>>> proxy.todb(big_table, table_name='point', batch_size=128, batch_commit=True)
 >>> proxy.close()
 ```
 
@@ -113,10 +116,10 @@ Basic configuration for this module
 ##### ``.set``(db_config, db_label, [driver]): does basic configuration for this module.
 
 ```
->>> from dbman import BasicConfig, RWProxy
+>>> from dbman import BasicConfig, Proxy
 >>> BasicConfig.set(db_config=db_conf_path, db_label='foo_label') 
->>> # with statement auto close connection/auto commit.
->>> with RWProxy() as proxy:
+>>> # with statement auto commit/close.
+>>> with Proxy() as proxy:
 ...     proxy.cursor().execute('INSERT INTO point (y, x, z) VALUES (10, 10, 10);')
 ...
 >>>
@@ -132,7 +135,7 @@ Basic configuration for this module
 >>> connect(driver='pymssql', host='localhost', user='root', password='', port=1433, database='baz') 
 ```
 
-### class ``dbman.RWProxy``([connection, [driver, [db_config, [db_label]]]]):
+### class ``dbman.Proxy``([connection, [driver, [db_config, [db_label]]]]):
 A connection proxy class which method `.fromdb()` for reading and `.todb()` for writing.
 The argument `connection` should be an connection object this proxy bind with.
 The argument `driver` is a package name of underlying database drivers that clients want to use, `BasicConfig.driver`
@@ -141,24 +144,23 @@ The argument `db_config` is a yaml file path, `BasicConfig.db_config` will be us
 The argument `db_label` is a string represents a schema, `BasicConfig.db_label` will be used if it's omitted.
 
 
-### `RWProxy.fromdb`(select_stmt, args=None, latency=False)
+### `Proxy.fromdb`(select_stmt, args=None, latency=False)
 Argument `select_stmt` and `args` will be passed to the underlying API `cursor.execute()`.
 fetch and wrap all data immediately if the argument `latency` is `False`
 
 
-### `RWProxy.todb`(table, table_name, mode='insert', with_header=True, slice_size=128, unique_key=())
-this method return a number that describes affected row number<br/>
-the argumen `table` can be a `petl.util.base.Table` 
-or a sequence like: [header, row1, row2, ...] or [row1, row2, ...].<br />
-the argument `table_name` is the name of a table in this schema.<br />
-the argument `mode`:<br />
-    execute SQL INSERT INTO Statement if `mode` equal to 'insert'.<br/>
-    execute SQL REPLACE INTO Statement if `mode` equal to 'replace'.<br/>
-    execute SQL INSERT ... ON DUPLICATE KEY UPDATE Statement if `mode` equal to 'update'.<br/>
-    execute SQL INSERT INTO Statement before attempting to execute SQL TRUNCATE TABLE Statement
-        if `mode` equal to 'truncate'.<br/>
-    execute SQL INSERT INTO Statement before attempting to automatically create a database table which requires
-      `SQLAlchemy <http://www.sqlalchemy.org/>` to be installed if `mode` equal to 'create'<br/>
-the argument `unique_key` must be present if the argument `mode` is 'update', otherwise it will be ignored.<br />
-the argument `with_header` should be `True` if the argument `table` with header, otherwise `False`.<br />
-the argument `slice_size` used to slice `table` into many subtable with `slice_size`, 1 transaction for 1 subtable.<br />
+### `Proxy.todb`(table, table_name, mode='insert',  batch_size=128, batch_commit=False, unique_key=())
+        :param table: a `petl.util.base.Table` or a sequence like this:
+            [header, row1, row2, ...] or [row1, row2, ...]
+        :param table_name: the name of a table in connected database
+        :param mode:
+            execute SQL INSERT INTO Statement if `mode` equal to 'insert'.
+            execute SQL REPLACE INTO Statement if `mode` equal to 'replace'.
+            execute SQL INSERT ... ON DUPLICATE KEY UPDATE Statement if `mode` equal to 'update'.
+            execute SQL INSERT INTO Statement before attempting to execute SQL TRUNCATE TABLE Statement
+                if `mode` equal to 'truncate'.
+            execute SQL INSERT INTO Statement before attempting to automatically create a database table which requires
+              `SQLAlchemy <http://www.sqlalchemy.org/>` to be installed if `mode` equal to 'create'
+        :param batch_size: the `table` will be slice to many subtable with `batch_size`, batch execute for 1 subtable.
+        :param batch_commit: the `table` will be slice to many subtable with `batch_size`, 1 transaction for 1 subtable if `batch_commit` is True.
+        :param unique_key: it must be present if the argument `mode` is 'update', otherwise it will be ignored.
