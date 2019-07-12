@@ -137,7 +137,7 @@ class Proxy(object):
         self.close()
         return False
 
-    def fromdb(self, select_stmt, args=None, latency=False):
+    def fromdb(self, select_stmt, args=None, latency=True):
         """argument `select_stmt` and `args` will be passed to the underlying API `cursor.execute()`.
         fetch and wrap all data immediately if the argument `latency` is `False`
         """

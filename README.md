@@ -150,7 +150,7 @@ The argument `db_config` is a yaml file path, `BasicConfig.db_config` will be us
 The argument `db_label` is a string represents a schema, `BasicConfig.db_label` will be used if it's omitted.
 
 
-### `Proxy.fromdb`(select_stmt, args=None, latency=False)
+### `Proxy.fromdb`(select_stmt, args=None, latency=True)
 Argument `select_stmt` and `args` will be passed to the underlying API `cursor.execute()`.
 fetch and wrap all data immediately if the argument `latency` is `False`
 
