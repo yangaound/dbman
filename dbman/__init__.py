@@ -167,7 +167,7 @@ class Proxy(object):
             create_table(table, self.connection, table_name)
             mode = 'INSERT'
         if mode == 'TRUNCATE':
-            self.cursor().execute("TRUNCATE TABLE `%(table_name)s`;", {'table_name': table_name})
+            self.cursor().execute("TRUNCATE TABLE %s;" % table_name)
             mode = 'INSERT'
         kwargs = {
             'connection': self.connection,
@@ -191,8 +191,8 @@ class Proxy(object):
         return self._connection
 
     def cursor(self, **kwargs):
-        """cursor factory method"""
-        return self.connection.cursor(**kwargs)
+        self._cursor = self.connection.cursor(**kwargs)
+        return self._cursor
 
     def close(self):
         self._connection.close()
@@ -224,7 +224,7 @@ class WriterInterface(object):
         self.row_count = self.table.nrows()
 
     def write(self):
-        cursor = self.connection.cursor()
+        self._cursor = cursor = self.connection.cursor()
         sql_fmt = self._make_query_fmt()
         affected_row_count = 0
         for sub_table in self.__slice_table():
@@ -234,6 +234,18 @@ class WriterInterface(object):
                 self.connection.commit()
         self.connection.commit()
         return affected_row_count
+
+    def make_sql(self):
+        """:return collections.Iterable<unicode>, where unicode is a valid SQL Statement"""
+        for row in self.table.dicts():
+            yield u"%s %s(%s) VALUES (%s) %s %s" % (
+                self.PREFIX,
+                self._table_name_q(),
+                self._fields_q(row.keys()),
+                ', '.join(map(self._to_q, row.values())),
+                self.POSTFIX,
+                self._items_q(),
+            )
 
     def _make_query_fmt(self):
         return u"%s %s(%s) VALUES (%s) %s %s" % (
@@ -260,9 +272,10 @@ class WriterInterface(object):
         table_name = self.table_name
         if '.' in table_name:
             tu = table_name.split('.')
-            return "`%s`.`%s`" % (tu[0], tu[1])
+            ss = "`%s`.`%s`" % (tu[0], tu[1])
         else:
-            return "`%s`" % table_name
+            ss = "`%s`" % table_name
+        return ss.replace('``', '`')
 
     def _fields_q(self, header=None):
         return u', '.join(["`%s`" % f for f in header or self.header])
@@ -286,22 +299,9 @@ class WriterInterface(object):
             sql = u"'%s'" % obj
         return sql
 
-    @abc.abstractmethod
-    def make_sql(self):
-        """:return collections.Iterable<unicode>, where unicode is a valid SQL Statement"""
-
 
 class _InsertingWriter(WriterInterface):
-
-    def make_sql(self):
-        for row in self.table.dicts():
-            sql = u"%s %s (%s) VALUES (%s)" % (
-                self.PREFIX,
-                self._table_name_q(),
-                self._fields_q(row.keys()),
-                u', '.join(map(self._to_q, row.values()))
-            )
-            yield sql
+    """"""
 
 
 class _MySQLReplacing(_InsertingWriter):
@@ -317,15 +317,4 @@ class _MySQLUpdating(WriterInterface):
         assert unique_key, 'argument unique_key must be specified'
 
     def _items_q(self):
-        return ', '.join(map(lambda f: u"`%s`=VALUES(`%s`)" % (f, f), (f for f in self.header if f not in self.unique_key)))
-
-    def make_sql(self):
-        for row in self.table.dicts():
-            yield u"%s %s(%s) VALUES (%s) %s %s" % (
-                self.PREFIX,
-                self._table_name_q(),
-                self._fields_q(row.keys()),
-                ', '.join(map(self._to_q, row.values())),
-                self.POSTFIX,
-                self._items_q(),
-            )
+        return ', '.join((u"`%s`=VALUES(`%s`)" % (f, f) for f in self.header if f not in self.unique_key))
