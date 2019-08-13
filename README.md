@@ -26,7 +26,7 @@ Low Level Database I/O Adapter to A Pure Python Database Driver
 ...
 >>> # does basic configuration for this module
 >>> from dbman import BasicConfig, Proxy
->>> BasicConfig.set(db_config=db_conf_path, db_label='foo_label')
+>>> BasicConfig.configure(db_config=db_conf_path, db_label='foo_label')
 >>> proxy = Proxy()                             # use basic configuration
 >>> proxy._driver                               # using underlying driver name
 >>> proxy._connection                           # bound connection for proxy
@@ -124,7 +124,7 @@ Basic configuration for this module
 ##### `.db_config`: a yaml file path
 ##### `.db_label`: a string represents default database schema
 ##### `.driver`: a package name of underlying database driver, 'pymysql' will be assumed by default.
-##### ``.set``(db_config, db_label, [driver]): does basic configuration for this module.
+##### `.configure`([db_config, [db_label, [driver]]]): does basic configuration for this module.
 
 ```
 >>> from dbman import BasicConfig, Proxy

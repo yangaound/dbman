@@ -15,21 +15,24 @@ import petl
 
 __version__ = '1.0.1'
 
+default_db_conf_path = os.path.join(os.path.expanduser("~"), 'dbconfig.yaml')
+default_db_label = '127.0.0.1'
+default_db_driver = 'pymysql'
 
 class BasicConfig:
     # default configuration file path
-    db_config = os.path.join(os.path.expanduser("~"), 'dbconfig.yaml')
+    db_config = default_db_conf_path
     # a string represents default database schema
-    db_label = '127.0.0.1'
+    db_label = default_db_label
     # default package name of underlying database driver.
-    driver = 'pymysql'
+    driver = default_db_driver
 
     @classmethod
-    def set(cls, db_config, db_label, driver=None, ):
+    def configure(cls, db_config=default_db_conf_path, db_label=default_db_label, driver=default_db_driver):
         """Does basic configuration for this module."""
         cls.db_config = db_config
         cls.db_label = db_label
-        cls.driver = driver or BasicConfig.driver
+        cls.driver = driver
 
     def __init__(self):
         raise NotImplementedError('can not initialize %s' % self.__class__)
@@ -54,7 +57,7 @@ def connect(driver=None, **connect_kwargs):
 
 def load_db_config(db_config):
     with open(db_config) as f:
-        config = yaml.load(f)
+        config = yaml.safe_load(f)
     return config
 
 
@@ -163,9 +166,10 @@ class Proxy(object):
         """
         mode = mode.upper()
         if mode == 'CREATE':
-            from petl.io.db_create import create_table
-            create_table(table, self.connection, table_name)
-            mode = 'INSERT'
+            import petl
+            cursor = self.connection.cursor()
+            cursor.execute("SET SQL_MODE=ANSI_QUOTES")
+            return petl.todb(table, cursor, table_name, create=True, commit=True)
         if mode == 'TRUNCATE':
             self.cursor().execute("TRUNCATE TABLE %s;" % table_name)
             mode = 'INSERT'
