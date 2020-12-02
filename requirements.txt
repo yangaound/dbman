@@ -1,4 +1,4 @@
 yaml==3.12
-petl==1.0.1
+petl==1.6.8
 #SQLAlchemy==1.1.2
 #PyMySQL==0.7.9
