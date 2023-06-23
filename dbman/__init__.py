@@ -13,7 +13,7 @@ import yaml
 import petl
 
 
-__version__ = '1.0.1'
+__version__ = '2.0.0'
 
 default_db_conf_path = os.path.join(os.path.expanduser("~"), 'dbconfig.yaml')
 default_db_label = '127.0.0.1'
@@ -122,7 +122,7 @@ class Proxy(object):
             if db_config is None:
                 self._driver = driver
                 self._connect_kwargs = {}
-            elif isinstance(db_config, basestring):
+            elif isinstance(db_config, str):
                 config = load_db_config(db_config)
                 self._driver = config[db_label]['driver']
                 self._connect_kwargs = config[db_label]['connect_kwargs']
@@ -242,7 +242,7 @@ class WriterInterface(object):
     def make_sql(self):
         """:return collections.Iterable<unicode>, where unicode is a valid SQL Statement"""
         for row in self.table.dicts():
-            yield u"%s %s(%s) VALUES (%s) %s %s" % (
+            yield "%s %s(%s) VALUES (%s) %s %s" % (
                 self.PREFIX,
                 self._table_name_q(),
                 self._fields_q(row.keys()),
@@ -252,7 +252,7 @@ class WriterInterface(object):
             )
 
     def _make_query_fmt(self):
-        return u"%s %s(%s) VALUES (%s) %s %s" % (
+        return "%s %s(%s) VALUES (%s) %s %s" % (
             self.PREFIX,
             self._table_name_q(),
             self._fields_q(),
@@ -265,7 +265,8 @@ class WriterInterface(object):
         if self.row_count <= self.batch_size:
             yield self.table[1:]
             return
-        for loop_count in range(self.row_count / self.batch_size + 1):
+
+        for loop_count in range(self.row_count // self.batch_size + 1):
             left = loop_count * self.batch_size + 1
             right = (loop_count + 1) * self.batch_size + 1
             if left > self.row_count:
@@ -282,10 +283,10 @@ class WriterInterface(object):
         return ss.replace('``', '`')
 
     def _fields_q(self, header=None):
-        return u', '.join(["`%s`" % f for f in header or self.header])
+        return ', '.join(["`%s`" % f for f in header or self.header])
 
     def _values_f(self):
-        return u', '.join(('%s',) * len(self.header))
+        return ', '.join(('%s',) * len(self.header))
 
     def _items_q(self):
         return ''
@@ -295,12 +296,12 @@ class WriterInterface(object):
             sql = 'NULL'
         elif isinstance(obj, numbers.Number):
             sql = str(obj)
-        elif isinstance(obj, basestring):
-            sql = u"'%s'" % obj.replace("'", "''")
+        elif isinstance(obj, str):
+            sql = "'%s'" % obj.replace("'", "''")
         elif isinstance(obj, (list, tuple)):
             return type(obj)([self._to_q(i) for i in obj])
         else:
-            sql = u"'%s'" % obj
+            sql = "'%s'" % obj
         return sql
 
 
@@ -321,4 +322,4 @@ class _MySQLUpdating(WriterInterface):
         assert unique_key, 'argument unique_key must be specified'
 
     def _items_q(self):
-        return ', '.join((u"`%s`=VALUES(`%s`)" % (f, f) for f in self.header if f not in self.unique_key))
+        return ', '.join(("`%s`=VALUES(`%s`)" % (f, f) for f in self.header if f not in self.unique_key))
