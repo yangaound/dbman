@@ -1,5 +1,5 @@
 # dbman
-Low Level Database I/O Adapter to A Pure Python Database Driver
+Low Level Database I/O Adapter to A Pure Python Database Driver (DBAPI)
 
 # Demo
 ```
