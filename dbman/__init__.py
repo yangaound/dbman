@@ -13,11 +13,12 @@ import yaml
 import petl
 
 
-__version__ = '1.0.1'
+__version__ = '2.0.0'
 
 default_db_conf_path = os.path.join(os.path.expanduser("~"), 'dbconfig.yaml')
 default_db_label = '127.0.0.1'
 default_db_driver = 'pymysql'
+
 
 class BasicConfig:
     # default configuration file path
@@ -61,7 +62,7 @@ def load_db_config(db_config):
     return config
 
 
-class Proxy(object):
+class DBProxy(object):
     """a connection proxy class which method `.fromdb()` for reading and `.todb()` from writing
     E.g.,
 
@@ -87,9 +88,9 @@ class Proxy(object):
     ...     yaml.dump(configuration, fp)
     ...
     >>> # does basic configuration for this module
-    >>> from dbman import BasicConfig, Proxy
-    >>> BasicConfig.set(db_config=db_conf_path, db_label='foo_label')
-    >>> proxy = Proxy()                             # use basic configuration
+    >>> from dbman import BasicConfig, DBProxy
+    >>> BasicConfig.configure(db_config=db_conf_path, db_label='foo_label')
+    >>> proxy = DBProxy()                           # use basic configuration
     >>> proxy._driver                               # using underlying driver name
     >>> proxy._connection                           # bound connection for proxy
     >>> proxy.connection                            # property that reference to the bound connection
@@ -97,7 +98,7 @@ class Proxy(object):
     >>> proxy.close()
     >>>
     >>> # with statement auto commit/close.
-    >>> with Proxy(db_config=db_conf_path, db_label='foo_label') as proxy:
+    >>> with DBProxy(db_config=db_conf_path, db_label='foo_label') as proxy:
     ...     proxy.cursor().execute('INSERT INTO point (y, x, z) VALUES (10, 10, 10);')
     ...
     """
@@ -112,6 +113,7 @@ class Proxy(object):
         :type driver: `str` = {'pymysql' | 'MySQLdb' | 'pymssql'}
         """
 
+        self._cursor = None
         if connection:
             self._connection = connection                                     # binding connection
             self._driver = driver or BasicConfig.driver
@@ -122,7 +124,7 @@ class Proxy(object):
             if db_config is None:
                 self._driver = driver
                 self._connect_kwargs = {}
-            elif isinstance(db_config, basestring):
+            elif isinstance(db_config, str):
                 config = load_db_config(db_config)
                 self._driver = config[db_label]['driver']
                 self._connect_kwargs = config[db_label]['connect_kwargs']
@@ -147,7 +149,7 @@ class Proxy(object):
         temp = petl.fromdb(self.connection, select_stmt, args)
         return temp if latency else petl.wrap([row for row in temp])
 
-    def todb(self, table, table_name, mode='insert', batch_size=128, batch_commit=False, unique_key=()):
+    def todb(self, table, table_name, mode='insert', batch_size=128, unique_key=()):
         """
         :param table: a `petl.util.base.Table` or a sequence like this:
             [header, row1, row2, ...] or [row1, row2, ...]
@@ -160,8 +162,7 @@ class Proxy(object):
                 if `mode` equal to 'truncate'.
             execute SQL INSERT INTO Statement before attempting to automatically create a database table which requires
               `SQLAlchemy <http://www.sqlalchemy.org/>` to be installed if `mode` equal to 'create'
-        :param batch_size: the `table` will be slice to many subtable with `batch_size`, batch execute for 1 subtable.
-        :param batch_commit: the `table` will be slice to many subtable with `batch_size`, 1 transaction for 1 subtable if `batch_commit` is True.
+        :param batch_size: The `table` will be sliced into many sub-tables with `batch_size`, batch execute sub-table.
         :param unique_key: it must be present if the argument `mode` is 'update', otherwise it will be ignored.
         """
         mode = mode.upper()
@@ -178,7 +179,7 @@ class Proxy(object):
             'table': table,
             'table_name': table_name,
             'batch_size': batch_size,
-            'batch_commit': batch_commit,
+            'batch_commit': False,
         }
         if (mode == 'UPDATE') and self._driver and ('MYSQL' in self._driver.upper()):
             self.writer = _MySQLUpdating(unique_key=unique_key, **kwargs)
@@ -226,6 +227,7 @@ class WriterInterface(object):
         self.table = table
         self.header = self.table.header()
         self.row_count = self.table.nrows()
+        self._cursor = None
 
     def write(self):
         self._cursor = cursor = self.connection.cursor()
@@ -242,7 +244,7 @@ class WriterInterface(object):
     def make_sql(self):
         """:return collections.Iterable<unicode>, where unicode is a valid SQL Statement"""
         for row in self.table.dicts():
-            yield u"%s %s(%s) VALUES (%s) %s %s" % (
+            yield "%s %s(%s) VALUES (%s) %s %s" % (
                 self.PREFIX,
                 self._table_name_q(),
                 self._fields_q(row.keys()),
@@ -252,7 +254,7 @@ class WriterInterface(object):
             )
 
     def _make_query_fmt(self):
-        return u"%s %s(%s) VALUES (%s) %s %s" % (
+        return "%s %s(%s) VALUES (%s) %s %s" % (
             self.PREFIX,
             self._table_name_q(),
             self._fields_q(),
@@ -265,7 +267,8 @@ class WriterInterface(object):
         if self.row_count <= self.batch_size:
             yield self.table[1:]
             return
-        for loop_count in range(self.row_count / self.batch_size + 1):
+
+        for loop_count in range(self.row_count // self.batch_size + 1):
             left = loop_count * self.batch_size + 1
             right = (loop_count + 1) * self.batch_size + 1
             if left > self.row_count:
@@ -282,10 +285,10 @@ class WriterInterface(object):
         return ss.replace('``', '`')
 
     def _fields_q(self, header=None):
-        return u', '.join(["`%s`" % f for f in header or self.header])
+        return ', '.join(["`%s`" % f for f in header or self.header]).replace('%', '%%')
 
     def _values_f(self):
-        return u', '.join(('%s',) * len(self.header))
+        return ', '.join(('%s',) * len(self.header))
 
     def _items_q(self):
         return ''
@@ -295,12 +298,12 @@ class WriterInterface(object):
             sql = 'NULL'
         elif isinstance(obj, numbers.Number):
             sql = str(obj)
-        elif isinstance(obj, basestring):
-            sql = u"'%s'" % obj.replace("'", "''")
+        elif isinstance(obj, str):
+            sql = "'%s'" % obj.replace("'", "''")
         elif isinstance(obj, (list, tuple)):
             return type(obj)([self._to_q(i) for i in obj])
         else:
-            sql = u"'%s'" % obj
+            sql = "'%s'" % obj
         return sql
 
 
@@ -321,4 +324,4 @@ class _MySQLUpdating(WriterInterface):
         assert unique_key, 'argument unique_key must be specified'
 
     def _items_q(self):
-        return ', '.join((u"`%s`=VALUES(`%s`)" % (f, f) for f in self.header if f not in self.unique_key))
+        return ', '.join(("`%s`=VALUES(`%s`)" % (f, f) for f in self.header if f not in self.unique_key))
